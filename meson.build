@@ -29,12 +29,12 @@ files_panfrost = files(
   'midgard/midgard_compile.c',
   'midgard/cppwrap.cpp',
 
-    '/home/guest/panloader/trans/pandev.c',
-    '/home/guest/panloader/trans/allocate.c',
-    '/home/guest/panloader/trans/assemble.c',
-    '/home/guest/panloader/trans/slow-framebuffer.c',
-    '/home/guest/panloader/trans/trans-builder.c',
-    '/home/guest/panloader/trans/limare-swizzle.c',
+  'pandev.c',
+  'allocate.c',
+  'assemble.c',
+  'slow-framebuffer.c',
+  'trans-builder.c',
+  'limare-swizzle.c',
 )
 
 midgard_nir_algebraic_c = custom_target(
@@ -53,7 +53,7 @@ libpanfrost = static_library(
   'panfrost',
   [files_panfrost, midgard_nir_algebraic_c],
   dependencies: [cc.find_library('X11', required: true), dep_thread, idep_nir],
-  include_directories : [inc_common, inc_gallium_aux, inc_gallium, inc_include, inc_src, include_directories('midgard'), include_directories('/home/guest/panloader/trans'), include_directories('/home/guest/panloader/include'), include_directories('/home/guest/panloader/build/include')],
+  include_directories : [inc_common, inc_gallium_aux, inc_gallium, inc_include, inc_src, include_directories('midgard'), include_directories('/home/guest/panloader/include'), include_directories('/home/guest/panloader/build/include')],
   c_args : [c_vis_args, c_msvc_compat_args],
 )
 
