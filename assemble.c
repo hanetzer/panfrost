@@ -1,0 +1,175 @@
+/*
+ * © Copyright 2018 The Panfrost Community
+ *
+ * This program is free software and is provided to you under the terms of the
+ * GNU General Public License version 2 as published by the Free Software
+ * Foundation, and any use by you of this program is subject to the terms
+ * of such GNU licence.
+ *
+ * A copy of the licence is included with the program, and can also be obtained
+ * from Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA  02110-1301, USA.
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "pandev.h"
+
+/* TODO: Bifrost */
+
+/* Takes shader source code in *src, calls out to the shader assembler, and
+ * sticks the resulting raw binary in dst, for use in replays */
+
+/* TODO: Interface with Python C API directly? */
+
+void
+pandev_shader_assemble(uint32_t *dst, const char *src, int type)
+{
+	FILE *fp0 = fopen("/dev/shm/shader.asm", "w");
+	fwrite(src, 1, strlen(src), fp0);
+	fclose(fp0);
+
+	system("python3 ../tools/midgard-assemble.py /dev/shm/shader.asm /dev/shm/shader.bin");
+
+	FILE *fp1 = fopen("/dev/shm/shader.bin", "rb");
+
+	fseek(fp1, 0, SEEK_END);
+	size_t sz = ftell(fp1);
+	fseek(fp1, 0, SEEK_SET);
+
+	fread(dst, 1, sz, fp1);
+	fclose(fp1);
+}
+
+/* XXX: This is a hack to avoid breaking prototypes in a bunch of places */
+int last_shader_size = 0;
+
+void *
+pandev_shader_compile(uint32_t *dst, const char *src, int type)
+{
+	FILE *fp1 = fopen(type == JOB_TYPE_TILER ? "/dev/shm/fragment.bin" : "/dev/shm/vertex.bin", "rb");
+
+	fseek(fp1, 0, SEEK_END);
+	size_t sz = ftell(fp1);
+	fseek(fp1, 0, SEEK_SET);
+
+	/* Allocate space if necessary */
+
+	if (!dst) {
+		dst = malloc(sz * 16);
+		last_shader_size = sz;
+	}
+
+	fread(dst, 1, sz, fp1);
+	fclose(fp1);
+
+	return dst;
+}
+
+/* TODO: Is there a sane way of approaching this? */
+#include "trans-builder.h"
+
+#ifdef HAVE_DRI3
+#include "compiler/nir/nir.h"
+#include "nir/tgsi_to_nir.h"
+#include "midgard/midgard_compile.h"
+#include "util/u_dynarray.h"
+#endif
+
+void
+panfrost_shader_compile(struct panfrost_context *ctx, struct mali_tripipe *meta, const char *src, int type, struct panfrost_shader_state *state)
+{
+	uint8_t* dst;
+
+#ifdef HAVE_DRI3
+	/* When running inside Mesa, invoke the compiler do the whole compile shebang */
+	nir_shader *s;
+
+	struct pipe_shader_state* cso = &state->base;
+	
+	if (cso->type == PIPE_SHADER_IR_NIR) {
+		printf("NIR in\n");
+		s = cso->ir.nir;
+	} else {
+		printf("TGSI in\n");
+		assert (cso->type == PIPE_SHADER_IR_TGSI);
+
+		s = tgsi_to_nir(cso->tokens, &midgard_nir_options);
+	}
+
+	s->info.stage = type == JOB_TYPE_VERTEX ? MESA_SHADER_VERTEX : MESA_SHADER_FRAGMENT;
+
+	/* Dump NIR for debugging */
+
+	nir_print_shader(s, stderr);
+
+	/* Call out to Midgard compiler given the above NIR */
+
+	struct util_dynarray compiled;
+	midgard_compile_shader_nir(s, &compiled);
+
+	/* Prepare the compiled binary for upload */
+	last_shader_size = compiled.size;
+	dst = compiled.data;
+	printf("Size: %d\n", last_shader_size);
+	printf("dst: %p\n", dst);
+	FILE *fp = fopen("/dev/shm/s.bin", "wb");
+	fwrite(dst, 1, last_shader_size, fp);
+	fclose(fp);
+#else
+	/* When running standalone, use precompiled or runtime assembly of shaders */
+	if (src) {
+		last_shader_size = 1024;
+		dst = malloc(last_shader_size);
+		pandev_shader_assemble((uint32_t *) dst, src, type);
+	} else {
+		dst = pandev_shader_compile(NULL, NULL, type);
+	}
+#endif
+
+	meta->shader = panfrost_upload(&ctx->shaders, dst, last_shader_size, true) | 5;
+
+#ifdef HAVE_DRI3
+	util_dynarray_fini(&compiled);
+#else
+	free(dst);
+#endif
+
+    /* TODO: From compiler */
+
+    if (type == JOB_TYPE_VERTEX) {
+	    meta->attribute_count = 3;
+	    meta->varying_count = 4;
+	    meta->uniform_count = 12;
+	    meta->unknown1 = 1; /* XXX: WTF is this?! */
+    } else {
+	    meta->attribute_count = 0;
+	    meta->varying_count = 2;
+	    meta->uniform_count = 1;
+	    meta->texture_count = 3;
+	    meta->sampler_count = 3;
+	    meta->unknown1 = MALI_NO_ALPHA_TO_COVERAGE | 0x200; /* XXX: WTF is this?! */
+    }
+
+    meta->work_count = 8;
+
+    /* Varyings are known only through the shader. We choose to upload this
+     * information with the vertex shader, though the choice is perhaps
+     * arbitrary */
+
+    if (type == JOB_TYPE_VERTEX) {
+	    ctx->varyings_stride[0] = 4 * sizeof(float);
+	    ctx->varyings_stride[1] = 4 * sizeof(float);
+	    
+	    ctx->varying_count = 2;
+
+	    ctx->varyings_descriptor_0.unknown0 = 0x179a2201;
+	    ctx->varyings_descriptor_0.unknown1 = 0x17e49000;
+
+	    ctx->varyings_descriptor_1.unknown0 = 0x2fda2200;
+	    ctx->varyings_descriptor_1.unknown1 = 0x2fda2200;
+
+    }
+}
