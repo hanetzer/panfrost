@@ -53,7 +53,7 @@ libpanfrost = static_library(
   'panfrost',
   [files_panfrost, midgard_nir_algebraic_c],
   dependencies: [cc.find_library('X11', required: true), dep_thread, idep_nir],
-  include_directories : [inc_common, inc_gallium_aux, inc_gallium, inc_include, inc_src, include_directories('midgard'), include_directories('/home/guest/panloader/include'), include_directories('/home/guest/panloader/build/include')],
+  include_directories : [inc_common, inc_gallium_aux, inc_gallium, inc_include, inc_src, include_directories('midgard'), include_directories('include')],
   c_args : [c_vis_args, c_msvc_compat_args],
 )
 
