@@ -42,7 +42,6 @@ space_bits_4(int i)
 
 uint32_t space_filler[16][16];
 uint32_t space_filler_packed4[16][4];
-unsigned space_filler_one[16];
 
 void
 trans_generate_space_filler_indices()
@@ -60,8 +59,6 @@ trans_generate_space_filler_indices()
 				(space_filler[y][(q*4) + 2] << 16) |
 				(space_filler[y][(q*4) + 3] << 24);
 		}
-
-		space_filler_one[y] = space_bits_4(y);
 	}
 }
 
