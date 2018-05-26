@@ -14,19 +14,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <assert.h>
 
-#include <panloader-util.h>
 #include <mali-ioctl.h>
-#include "pan_nondrm.h"
-#include <mali-job.h>
-
-#include <sys/user.h>
 
 /* From the kernel module */
 
