@@ -35,11 +35,6 @@
 	else \
 		lval &= ~(bit);
 
-/* The trans builder, as used in the _trans_itory driver (hence the name,
- * obviously!), exposes a thin layer over the hardware. It exposes a low-level
- * API for building up the GPU memory data structures based on state. It
- * explicitly does _not_ attempt to model OpenGL or other high-level APIs. */
-
 /* MSAA is not supported in sw_winsys but it does make for nicer demos ;) so we
  * can force it regardless of gallium saying we don't have it */
 static bool FORCE_MSAA = true;
@@ -67,22 +62,18 @@ trans_set_framebuffer_msaa(struct panfrost_context *ctx, bool enabled)
 
 /* Framebuffer descriptor */
 
-/* No idea why this is needed, but it's how resolution_check is calculated.
- * It's not clear to us yet why the hardware wants this. The formula itself was
- * discovered mostly by manual bruteforce... don't envy me, guys */
-
-static int
-trans_compute_fb_resolution_check(int width, int height)
-{
-	return ((width + height) / 3) << 4;
-}
-
 static void
 trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int h)
 {
 	fb->width = MALI_POSITIVE(w);
 	fb->height = MALI_POSITIVE(h);
-	fb->resolution_check = trans_compute_fb_resolution_check(w, h);
+
+	/* No idea why this is needed, but it's how resolution_check is
+	 * calculated.  It's not clear to us yet why the hardware wants this.
+	 * The formula itself was discovered mostly by manual bruteforce and
+	 * aggressive algebraic simplification. */
+
+	fb->resolution_check = ((w + h) / 3) << 4;
 }
 
 struct mali_single_framebuffer
@@ -128,8 +119,6 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 
         memcpy(&ctx->fragment_fbd, &fb, sizeof(fb));
 }
-
-/* Helpers used by the below functions */
 
 /* Maps float 0.0-1.0 to int 0x00-0xFF */
 static uint8_t
