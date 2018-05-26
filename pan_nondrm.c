@@ -69,7 +69,9 @@ pandev_open()
 	assert(pandev_ioctl(fd, MALI_IOCTL_GET_VERSION, &version) == 0);
 #endif
 	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
+#if 0
 	assert(pandev_ioctl(fd, MALI_IOCTL_SET_FLAGS, &args) == 0);
+#endif
 
 	return fd;
 }
