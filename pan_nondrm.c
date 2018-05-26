@@ -20,6 +20,7 @@
 #include <assert.h>
 
 #include <mali-ioctl.h>
+#include "pan_nondrm.h"
 
 /* From the kernel module */
 
@@ -61,8 +62,12 @@ pandev_open()
 	struct mali_ioctl_set_flags args = {};
 
 	int fd = open("/dev/mali0", O_RDWR | O_NONBLOCK | O_CLOEXEC);
+	assert(fd);
+	printf("%d\n", fd);
 
+#if 0
 	assert(pandev_ioctl(fd, MALI_IOCTL_GET_VERSION, &version) == 0);
+#endif
 	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
 	assert(pandev_ioctl(fd, MALI_IOCTL_SET_FLAGS, &args) == 0);
 
