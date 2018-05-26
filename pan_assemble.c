@@ -159,16 +159,49 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_tripipe *meta,
      * arbitrary */
 
     if (type == JOB_TYPE_VERTEX) {
+	    /* vec4 */
 	    ctx->varyings_stride[0] = 4 * sizeof(float);
+
+	    /* gl_Position */
 	    ctx->varyings_stride[1] = 4 * sizeof(float);
-	    
+
+	    struct mali_attr_meta position_meta = {
+		    .index = 1,
+		    .type = 6, /* gl_Position */
+		    .nr_components = MALI_POSITIVE(4),
+		    .is_int_signed = 1,
+		    .unknown1 = 0x1a22
+	    };
+
+	    struct mali_attr_meta vec4_varying_meta = {
+		    .index = 0,
+		    .type = 7, /* float */
+		    .nr_components = MALI_POSITIVE(4),
+		    .is_int_signed = 1,
+		    .unknown1 = 0x2490
+	    };
+
+	    struct mali_attr_meta vec4_varying_meta_2 = {
+		    .index = 0,
+		    .type = 7, /* float */
+		    .nr_components = MALI_POSITIVE(4),
+		    .not_normalised = 1,
+		    .unknown1 = 0x1a22,
+		    .unknown2 = 1,
+	    };
+
+
+	    u64 *u0 = (u64 *) &position_meta;
+	    u64 *u1 = (u64 *) &vec4_varying_meta;
+	    u64 *u2 = (u64 *) &vec4_varying_meta_2;
+
 	    ctx->varying_count = 2;
 
-	    ctx->varyings_descriptor_0.unknown0 = 0x179a2201;
-	    ctx->varyings_descriptor_0.unknown1 = 0x17e49000;
+	    ctx->varyings_descriptor_0.unknown0 = *u0;
+	    ctx->varyings_descriptor_0.unknown1 = *u1;
 
-	    ctx->varyings_descriptor_1.unknown0 = 0x2fda2200;
-	    ctx->varyings_descriptor_1.unknown1 = 0x2fda2200;
+	    ctx->varyings_descriptor_1.unknown0 = *u2;
+	    ctx->varyings_descriptor_1.unknown1 = *u2;
 
     }
 }
