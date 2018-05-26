@@ -58,18 +58,16 @@ pandev_standard_allocate(int fd, int va_pages, int flags, u64 *out)
 int
 pandev_open()
 {
-	struct mali_ioctl_get_version version = { .major = 10, .minor = 4 };
-	struct mali_ioctl_set_flags args = {};
 
 	int fd = open("/dev/mali0", O_RDWR | O_NONBLOCK | O_CLOEXEC);
 	assert(fd);
-	printf("%d\n", fd);
+	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
 
 #if 0
+	struct mali_ioctl_get_version version = { .major = 10, .minor = 4 };
+	struct mali_ioctl_set_flags args = {};
+
 	assert(pandev_ioctl(fd, MALI_IOCTL_GET_VERSION, &version) == 0);
-#endif
-	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
-#if 0
 	assert(pandev_ioctl(fd, MALI_IOCTL_SET_FLAGS, &args) == 0);
 #endif
 
