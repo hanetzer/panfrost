@@ -43,7 +43,7 @@
 #include "pan_screen.h"
 #include "pan_public.h"
 
-#include "trans-builder.h"
+#include "pan_context.h"
 #include "midgard/midgard_compile.h"
 
 static const char *
@@ -511,7 +511,7 @@ panfrost_destroy_screen( struct pipe_screen *screen )
    FREE(screen);
 }
 
-#include "trans-builder.h"
+#include "pan_context.h"
 
 static void
 panfrost_flush_frontbuffer(struct pipe_screen *_screen,

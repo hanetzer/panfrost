@@ -23,7 +23,7 @@
 
 #include <panloader-util.h>
 #include <mali-ioctl.h>
-#include "pandev.h"
+#include "pan_nondrm.h"
 #include <mali-job.h>
 
 #include <sys/user.h>

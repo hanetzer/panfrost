@@ -21,7 +21,7 @@
 #include <mali-ioctl.h>
 #include <mali-job.h>
 #include <linux/ioctl.h>
-#include "slow-framebuffer.h"
+#include "pan_slowfb.h"
 
 int pandev_open(void);
 

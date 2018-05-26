@@ -12,7 +12,7 @@
  *
  */
 
-#include "trans-builder.h"
+#include "pan_context.h"
 #include "pan_swizzle.h"
 
 #ifdef HAVE_DRI3

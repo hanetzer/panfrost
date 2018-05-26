@@ -16,7 +16,7 @@
 #define __TEXSWZ_H__
 
 #include <stdint.h>
-#include "pandev.h"
+#include "pan_nondrm.h"
 
 void
 trans_generate_space_filler_indices(void);

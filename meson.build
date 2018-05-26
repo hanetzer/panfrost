@@ -29,11 +29,12 @@ files_panfrost = files(
   'midgard/midgard_compile.c',
   'midgard/cppwrap.cpp',
 
-  'pandev.c',
-  'allocate.c',
-  'assemble.c',
-  'slow-framebuffer.c',
-  'trans-builder.c',
+  'pan_context.c',
+
+  'pan_nondrm.c',
+  'pan_allocate.c',
+  'pan_assemble.c',
+  'pan_slowfb.c',
   'pan_swizzle.c',
 )
 

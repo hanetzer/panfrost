@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "slow-framebuffer.h"
+#include "pan_slowfb.h"
 
 #ifndef __ANDROID__
 

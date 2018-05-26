@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pandev.h"
+#include "pan_nondrm.h"
 
 /* TODO: Bifrost */
 
@@ -68,8 +68,7 @@ pandev_shader_compile(uint32_t *dst, const char *src, int type)
 	return dst;
 }
 
-/* TODO: Is there a sane way of approaching this? */
-#include "trans-builder.h"
+#include "pan_context.h"
 
 #ifdef HAVE_DRI3
 #include "compiler/nir/nir.h"

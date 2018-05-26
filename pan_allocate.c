@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pandev.h"
+#include "pan_nondrm.h"
 
 /* TODO: What does this actually have to be? */
 #define ALIGNMENT 128

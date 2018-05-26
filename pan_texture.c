@@ -52,7 +52,7 @@ panfrost_can_create_resource(struct pipe_screen *screen,
 }
 
 #define __PAN_GALLIUM
-#include <trans-builder.h>
+#include <pan_context.h>
 
 static struct pipe_resource *
 panfrost_resource_create(struct pipe_screen *screen,

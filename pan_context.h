@@ -19,7 +19,7 @@
 #define CACHE_LINE_SIZE 1024 /* TODO */ 
 #include <sys/mman.h>
 #include <assert.h>
-#include "pandev.h"
+#include "pan_nondrm.h"
 
 #ifdef HAVE_DRI3
 #include "pipe/p_compiler.h"
