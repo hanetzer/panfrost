@@ -23,7 +23,7 @@
  */
 
 #include <stdio.h>
-#include "texture-swizzle.h"
+#include "pan_swizzle.h"
 
 /* Space a group of 4-bits out. For instance, 0x7 -- that is, 0b111 -- would
  * become 0b10101 */

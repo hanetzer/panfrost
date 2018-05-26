@@ -13,7 +13,7 @@
  */
 
 #include "trans-builder.h"
-#include "texture-swizzle.h"
+#include "pan_swizzle.h"
 
 #ifdef HAVE_DRI3
 #include "util/macros.h"
