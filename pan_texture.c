@@ -42,8 +42,6 @@
 #include "pan_texture.h"
 #include "pan_screen.h"
 
-#include "state_tracker/sw_winsys.h"
-
 static boolean
 panfrost_can_create_resource(struct pipe_screen *screen,
                              const struct pipe_resource *res)

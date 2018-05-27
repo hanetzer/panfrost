@@ -37,8 +37,6 @@
 #include "pipe/p_screen.h"
 #include "draw/draw_context.h"
 
-#include "state_tracker/sw_winsys.h"
-
 #include "pan_texture.h"
 #include "pan_screen.h"
 #include "pan_public.h"
@@ -503,10 +501,6 @@ static void
 panfrost_destroy_screen( struct pipe_screen *screen )
 {
    struct panfrost_screen *pan_screen = panfrost_screen(screen);
-   struct sw_winsys *winsys = pan_screen->winsys;
-
-   if(winsys->destroy)
-      winsys->destroy(winsys);
 
    FREE(screen);
 }
@@ -521,13 +515,7 @@ panfrost_flush_frontbuffer(struct pipe_screen *_screen,
                            struct pipe_box *sub_box)
 {
    struct panfrost_screen *screen = panfrost_screen(_screen);
-
-   struct sw_winsys *winsys = screen->winsys;
    struct panfrost_resource *texture = (struct panfrost_resource *) resource;
-
-   assert(texture->dt);
-   if (texture->dt)
-      winsys->displaytarget_display(winsys, texture->dt, context_private, sub_box);
 }
 
 static uint64_t
@@ -563,7 +551,7 @@ panfrost_screen_get_compiler_options(struct pipe_screen *pscreen,
 }
 
 struct pipe_screen *
-panfrost_create_screen(struct sw_winsys *winsys)
+panfrost_create_screen(int fd, struct renderonly *ro)
 {
    struct panfrost_screen *screen = CALLOC_STRUCT(panfrost_screen);
    printf("Size pan: %d\n", sizeof(*screen));
@@ -571,9 +559,7 @@ panfrost_create_screen(struct sw_winsys *winsys)
    if (!screen)
       return NULL;
 
-   screen->winsys = winsys;
-   printf("Base %p\n", &screen->base);
-   printf("Winsys %p\n", winsys);
+   printf("fd %d\n", fd);
 
    screen->base.destroy = panfrost_destroy_screen;
 

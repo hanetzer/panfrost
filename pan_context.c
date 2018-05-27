@@ -24,7 +24,6 @@
 #include "util/u_transfer.h"
 #include "util/u_transfer_helper.h"
 #include "indices/u_primconvert.h"
-#include "state_tracker/sw_winsys.h"
 
 #include "pan_screen.h"
 #endif
@@ -1647,9 +1646,12 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 	pipe_reference_init(&so->base.reference, 1);
 
 	if (template->bind & PIPE_BIND_DISPLAY_TARGET) {
+#if 0
 		struct sw_winsys *winsys = panfrost_screen(screen)->winsys;
 		unsigned stride;
 		so->dt = winsys->displaytarget_create(winsys, template->bind, template->format, template->width0, template->height0, 64, map_front_private, &stride);
+#endif
+		printf("Bind screen\n");
 	}
 
 	/* Fill out fields based on format itself */
@@ -1756,6 +1758,7 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
          pipe_surface_reference(&ctx->pipe_framebuffer.cbufs[i], cb);
 	 
 	 struct panfrost_screen* scr = (struct panfrost_screen *) pctx->screen;
+#if 0
 	 struct sw_winsys *winsys = scr->winsys;
 	 struct pipe_surface *surf = ctx->pipe_framebuffer.cbufs[i];
 
@@ -1765,6 +1768,8 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
 	 } else {
 		 printf("...unbind surface?\n");
 	 }
+#endif
+	 printf("Set framebuffer\n");
       }
    }
 

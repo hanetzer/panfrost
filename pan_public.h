@@ -6,10 +6,9 @@ extern "C" {
 #endif
 
 struct pipe_screen;
-struct sw_winsys;
 
 struct pipe_screen *
-panfrost_create_screen(struct sw_winsys *winsys);
+panfrost_create_screen(int fd, struct renderonly *ro);
 
 #ifdef __cplusplus
 }

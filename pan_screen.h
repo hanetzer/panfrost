@@ -34,12 +34,8 @@
 #include "pipe/p_screen.h"
 #include "pipe/p_defines.h"
 
-struct sw_winsys;
-
 struct panfrost_screen {
    struct pipe_screen base;
-
-   struct sw_winsys *winsys;
 };
 
 static inline struct panfrost_screen *
