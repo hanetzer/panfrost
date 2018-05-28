@@ -2108,9 +2108,9 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->cmdstream, 8*64*4, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->textures, 4*64*64, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->scratchpad, 16, true, true, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, MALI_MEM_COHERENT_LOCAL, 0, 0);
+	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 1, 0);
-	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, MALI_MEM_GROW_ON_GPF, 1, 128);
+	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
 	trans_setup_framebuffer(ctx, NULL, 1366, 768);
