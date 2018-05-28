@@ -437,15 +437,6 @@ trans_make_dominant_factor(unsigned src_factor, enum mali_dominant_factor *facto
 			*factor = MALI_DOMINANT_ZERO;
 			break;
 
-		case PIPE_BLENDFACTOR_SRC_ALPHA_SATURATE: 
-		case PIPE_BLENDFACTOR_CONST_COLOR: 
-		case PIPE_BLENDFACTOR_CONST_ALPHA: 
-		case PIPE_BLENDFACTOR_SRC1_COLOR: 
-		case PIPE_BLENDFACTOR_SRC1_ALPHA: 
-		case PIPE_BLENDFACTOR_INV_CONST_COLOR: 
-		case PIPE_BLENDFACTOR_INV_CONST_ALPHA: 
-		case PIPE_BLENDFACTOR_INV_SRC1_COLOR: 
-		case PIPE_BLENDFACTOR_INV_SRC1_ALPHA: 
 		default:
 			/* Fancy blend modes not supported */
 			return false;
