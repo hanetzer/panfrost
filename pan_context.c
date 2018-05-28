@@ -970,9 +970,9 @@ trans_queue_draw(struct panfrost_context *ctx)
  * then the fragment job is plonked at the end. Set value job is first for
  * unknown reasons. */
 
-#define JOB_DESC(ptr) ((struct mali_job_descriptor_header *) (uintptr_t) ptr)
+#define JOB_DESC(ptr) ((struct mali_job_descriptor_header *) (uintptr_t) (ptr - mem.gpu + (uintptr_t) mem.cpu))
 static void
-trans_link_job_pair(mali_ptr first, mali_ptr next)
+trans_link_job_pair(struct panfrost_memory mem, mali_ptr first, mali_ptr next)
 {
 	if (JOB_DESC(first)->job_descriptor_size)
 		JOB_DESC(first)->next_job_64 = (u64) (uintptr_t) next;
@@ -987,19 +987,21 @@ trans_link_jobs(struct panfrost_context *ctx)
 		/* Generate the set_value_job */
 		ctx->set_value_job = trans_set_value_job(ctx);
 
+		struct panfrost_memory mem = ctx->cmdstream;
+
 		/* Have the first vertex job depend on the set value job */
 		JOB_DESC(ctx->vertex_jobs[0])->job_dependency_index_1 = JOB_DESC(ctx->set_value_job)->job_index;
 
 		/* SV -> V */
-		trans_link_job_pair(ctx->set_value_job, ctx->vertex_jobs[0]);
+		trans_link_job_pair(mem, ctx->set_value_job, ctx->vertex_jobs[0]);
 	}
 
 	/* V -> V/T ; T -> T/null */
 	for (int i = 0; i < ctx->draw_count; ++i) {
 		bool isLast = (i + 1) == ctx->draw_count;
 
-		trans_link_job_pair(ctx->vertex_jobs[i], isLast ? ctx->tiler_jobs[0] : ctx->vertex_jobs[i + 1]);
-		trans_link_job_pair(ctx->tiler_jobs[i], isLast ? 0 : ctx->tiler_jobs[i + 1]);
+		trans_link_job_pair(ctx->cmdstream, ctx->vertex_jobs[i], isLast ? ctx->tiler_jobs[0] : ctx->vertex_jobs[i + 1]);
+		trans_link_job_pair(ctx->cmdstream, ctx->tiler_jobs[i], isLast ? 0 : ctx->tiler_jobs[i + 1]);
 	}
 }
 
