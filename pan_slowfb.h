@@ -15,7 +15,12 @@
 #ifndef __SLOW_FRAMEBUFFER_H__
 #define __SLOW_FRAMEBUFFER_H__
 
-void slowfb_init(uint8_t *framebuffer, int width, int height);
+struct slowfb_info {
+	uint8_t *framebuffer;
+	int stride;
+};
+
+struct slowfb_info slowfb_init(uint8_t *framebuffer, int width, int height);
 void slowfb_update(uint8_t *framebuffer, int width, int height);
 
 #endif /* __SLOW_FRAMEBUFFER_H__ */

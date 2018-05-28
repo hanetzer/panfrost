@@ -2077,7 +2077,11 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 		ctx->framebuffer.cpu = (uint8_t *) addr;
 	} else {
 		posix_memalign((void **) &ctx->framebuffer.cpu, CACHE_LINE_SIZE, framebuffer_sz + offset);
-		slowfb_init((uint8_t*) (ctx->framebuffer.cpu + offset), rw, ctx->height);
+		struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu + offset), rw, ctx->height);
+
+		/* May not be the same as our original alloc if we're using XShm, etc */
+		ctx->framebuffer.cpu = info.framebuffer;
+		ctx->stride = info.stride;
 	}
 
 	struct mali_mem_import_user_buffer framebuffer_handle = { .ptr = (uint64_t) (uintptr_t) ctx->framebuffer.cpu, .length = framebuffer_sz + offset };
@@ -2091,7 +2095,7 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
 
 	ctx->framebuffer.gpu = framebuffer_import.gpu_va;
-	ctx->framebuffer.size = framebuffer_sz;
+	ctx->framebuffer.size = ctx->stride * ctx->height;
 }
 
 static void
