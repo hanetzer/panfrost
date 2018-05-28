@@ -28,6 +28,8 @@
 #include "pan_screen.h"
 #endif
 
+#define USE_SLOWFB
+
 #define SET_BIT(lval, bit, cond) \
 	if (cond) \
 		lval |= (bit); \
@@ -1104,8 +1106,8 @@ panfrost_flush(
 	uint8_t kernel_events[128];
 	read(ctx->fd, kernel_events, 128);
 
+#ifdef USE_SLOWFB
 	/* Display the frame in our cute little window */
-#ifndef HAVE_DRI3
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->stride / 4, ctx->height);
 #endif
 }	
@@ -2128,8 +2130,7 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 1, 0);
 	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, MALI_MEM_GROW_ON_GPF, 1, 128);
 
-#ifndef HAVE_DRI3
-	/* Mesa allocates the framebuffer for us, but when standalone we handle it ourselves */
+#ifdef USE_SLOWFB
 	trans_setup_framebuffer(ctx, NULL, 1366, 768);
 #endif
 }
