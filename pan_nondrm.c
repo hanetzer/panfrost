@@ -61,13 +61,13 @@ pandev_open()
 
 	int fd = open("/dev/mali0", O_RDWR | O_NONBLOCK | O_CLOEXEC);
 	assert(fd);
-	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
 
 #if 0
 	struct mali_ioctl_get_version version = { .major = 10, .minor = 4 };
 	struct mali_ioctl_set_flags args = {};
 
 	assert(pandev_ioctl(fd, MALI_IOCTL_GET_VERSION, &version) == 0);
+	assert(mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd, MALI_MEM_MAP_TRACKING_HANDLE) != MAP_FAILED);
 	assert(pandev_ioctl(fd, MALI_IOCTL_SET_FLAGS, &args) == 0);
 #endif
 
