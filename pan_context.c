@@ -1648,11 +1648,6 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 	pipe_reference_init(&so->base.reference, 1);
 
 	if (template->bind & PIPE_BIND_DISPLAY_TARGET) {
-#if 0
-		struct sw_winsys *winsys = panfrost_screen(screen)->winsys;
-		unsigned stride;
-		so->dt = winsys->displaytarget_create(winsys, template->bind, template->format, template->width0, template->height0, 64, map_front_private, &stride);
-#endif
 		printf("Bind screen\n");
 	}
 
@@ -1760,17 +1755,7 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
          pipe_surface_reference(&ctx->pipe_framebuffer.cbufs[i], cb);
 	 
 	 struct panfrost_screen* scr = (struct panfrost_screen *) pctx->screen;
-#if 0
-	 struct sw_winsys *winsys = scr->winsys;
 	 struct pipe_surface *surf = ctx->pipe_framebuffer.cbufs[i];
-
-	 if (surf) {
-		 uint8_t *map = winsys->displaytarget_map(winsys, ((struct panfrost_resource *) surf->texture)->dt, PIPE_TRANSFER_WRITE);
-		 trans_setup_framebuffer(ctx, (uint32_t *) map, fb->width, fb->height);
-	 } else {
-		 printf("...unbind surface?\n");
-	 }
-#endif
 	 printf("Set framebuffer\n");
       }
    }
