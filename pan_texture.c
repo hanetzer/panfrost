@@ -42,6 +42,8 @@
 #include "pan_texture.h"
 #include "pan_screen.h"
 
+#include "renderonly/renderonly.h"
+
 static boolean
 panfrost_can_create_resource(struct pipe_screen *screen,
                              const struct pipe_resource *res)
@@ -80,10 +82,27 @@ static boolean
 panfrost_resource_get_handle(struct pipe_screen *screen,
                              struct pipe_context *ctx,
                              struct pipe_resource *pt,
-                             struct winsys_handle *whandle,
+                             struct winsys_handle *handle,
                              unsigned usage)
 {
-	assert(0);
+	struct panfrost_resource *rsrc = (struct panfrost_resource *) pt;
+
+	handle->stride = rsrc->stride;
+
+	if (handle->type == DRM_API_HANDLE_TYPE_SHARED) {
+		printf("Missed shared handle\n");
+		return FALSE;
+		//return etna_bo_get_name(rsc->bo, &handle->handle) == 0;
+	} else if (handle->type == DRM_API_HANDLE_TYPE_KMS) {
+		printf("Missed nonrenderonly KMS\n");
+		return FALSE;
+		//handle->handle = etna_bo_handle(rsc->bo);
+	} else if (handle->type == DRM_API_HANDLE_TYPE_FD) {
+		printf("Missed dmabuf\n");
+		return FALSE;
+		//handle->handle = etna_bo_dmabuf(rsc->bo);
+	}
+
 	return FALSE;
 }
 

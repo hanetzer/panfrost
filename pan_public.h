@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 struct pipe_screen;
+struct renderonly;
 
 struct pipe_screen *
 panfrost_create_screen(int fd, struct renderonly *ro);
