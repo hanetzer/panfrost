@@ -1021,6 +1021,8 @@ allocate_atom()
 	return atom_counter;
 }
 
+int last_fragment_id = -1;
+
 /* The entire frame is in memory -- send it off to the kernel! */
 
 static void
@@ -1033,6 +1035,15 @@ trans_submit_frame(struct panfrost_context *ctx)
 	trans_link_jobs(ctx);
 
 	ctx->draw_count = 0;
+
+	if (last_fragment_id != -1) {
+		/* Pipelined draws */
+		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
+
+		do {
+			read(ctx->fd, ev, sizeof(ev));
+		} while (ev[4] != last_fragment_id);
+	}
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1076,16 +1087,16 @@ trans_submit_frame(struct panfrost_context *ctx)
 	if (pandev_ioctl(ctx->fd, MALI_IOCTL_JOB_SUBMIT, &submit2))
 	    printf("Error submitting\n");
 
+#if 0
 	/* Hang until we get the DONE event */
 	uint8_t kernel_events[/* 1 */ 4 + 4 + 8 + 8];
 
 	do {
 		read(ctx->fd, kernel_events, sizeof(kernel_events));
 	} while (kernel_events[4] != atoms[0].atom_number);
+#endif
 
-	do {
-		read(ctx->fd, kernel_events, sizeof(kernel_events));
-	} while (kernel_events[4] != atoms[1].atom_number);
+	last_fragment_id = atoms[1].atom_number;
 }
 
 static void
