@@ -879,7 +879,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 			/* Shortcircuit */
 			if (!ctx->sampler_view_count[t]) continue;
 
-			uint64_t *trampolines = malloc(ctx->sampler_view_count[t] * sizeof(uint64_t));
+			uint64_t trampolines[PIPE_MAX_SHADER_SAMPLER_VIEWS];
 
 			for (int i = 0; i < ctx->sampler_view_count[t]; ++i) {
 				/* XXX: Why does this work? */
