@@ -1092,7 +1092,7 @@ panfrost_flush(
 	trans_submit_frame(ctx);
 
 	/* Prepare for the next frame */
-	usleep(1000);
+	usleep(1000*1000/240);
 	trans_invalidate_frame(ctx);
 
 	/* Clear the kernel event buffer */
@@ -1103,6 +1103,7 @@ panfrost_flush(
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->stride / 4, ctx->height);
 #endif
+	usleep(1000*1000/240);
 }	
 
 #define DEFINE_CASE(c) case PIPE_PRIM_##c: return MALI_GL_##c;

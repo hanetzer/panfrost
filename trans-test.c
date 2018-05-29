@@ -214,7 +214,6 @@ int main(int argc, const char **argv)
 #endif
 
 	gallium->flush(gallium, NULL, PIPE_FLUSH_END_OF_FRAME);
-	usleep(1000*1000/60);
     }
 
     gallium->transfer_unmap(gallium, transfer);
