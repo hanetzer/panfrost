@@ -1087,15 +1087,6 @@ trans_submit_frame(struct panfrost_context *ctx)
 	if (pandev_ioctl(ctx->fd, MALI_IOCTL_JOB_SUBMIT, &submit2))
 	    printf("Error submitting\n");
 
-#if 0
-	/* Hang until we get the DONE event */
-	uint8_t kernel_events[/* 1 */ 4 + 4 + 8 + 8];
-
-	do {
-		read(ctx->fd, kernel_events, sizeof(kernel_events));
-	} while (kernel_events[4] != atoms[0].atom_number);
-#endif
-
 	last_fragment_id = atoms[1].atom_number;
 }
 
