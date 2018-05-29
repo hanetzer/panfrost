@@ -1075,6 +1075,17 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 	if (pandev_ioctl(ctx->fd, MALI_IOCTL_JOB_SUBMIT, &submit2))
 	    printf("Error submitting\n");
+
+	/* Hang until we get the DONE event */
+	uint8_t kernel_events[/* 1 */ 4 + 4 + 8 + 8];
+
+	do {
+		read(ctx->fd, kernel_events, sizeof(kernel_events));
+	} while (kernel_events[4] != atoms[0].atom_number);
+
+	do {
+		read(ctx->fd, kernel_events, sizeof(kernel_events));
+	} while (kernel_events[4] != atoms[1].atom_number);
 }
 
 static void
@@ -1092,18 +1103,12 @@ panfrost_flush(
 	trans_submit_frame(ctx);
 
 	/* Prepare for the next frame */
-	usleep(1000*1000/240);
 	trans_invalidate_frame(ctx);
-
-	/* Clear the kernel event buffer */
-	uint8_t kernel_events[128];
-	read(ctx->fd, kernel_events, 128);
 
 #ifdef USE_SLOWFB
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->stride / 4, ctx->height);
 #endif
-	usleep(1000*1000/240);
 }	
 
 #define DEFINE_CASE(c) case PIPE_PRIM_##c: return MALI_GL_##c;
