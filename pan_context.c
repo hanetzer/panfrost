@@ -1053,7 +1053,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 		{
 			.jc = ctx->set_value_job,
 			.atom_number = allocate_atom(),
-			.compat_core_req = MALI_JD_REQ_CS | MALI_JD_REQ_T | MALI_JD_REQ_CF | MALI_JD_REQ_COHERENT_GROUP
+			.compat_core_req = MALI_JD_REQ_CS | MALI_JD_REQ_T | MALI_JD_REQ_CF | MALI_JD_REQ_COHERENT_GROUP | MALI_JD_REQ_EVENT_NEVER
 		},
 		{
 			.jc = trans_fragment_job(ctx),
