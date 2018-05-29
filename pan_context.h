@@ -144,10 +144,10 @@ struct panfrost_context {
 	struct pipe_vertex_buffer *vertex_buffers;
 	int vertex_buffer_count;
 
-	struct panfrost_sampler_state **samplers[PIPE_SHADER_TYPES];
+	struct panfrost_sampler_state *samplers[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
 	int sampler_count[PIPE_SHADER_TYPES];
 
-	struct panfrost_sampler_view **sampler_views[PIPE_SHADER_TYPES];
+	struct panfrost_sampler_view *sampler_views[PIPE_SHADER_TYPES][PIPE_MAX_SHADER_SAMPLER_VIEWS];
 	int sampler_view_count[PIPE_SHADER_TYPES];
 
 	struct primconvert_context *primconvert;

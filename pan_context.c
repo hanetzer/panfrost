@@ -1406,7 +1406,6 @@ panfrost_bind_sampler_states(
 	
 	/* XXX: Should upload, not just copy? */
 	ctx->sampler_count[shader] = num_sampler;
-	ctx->samplers[shader] = calloc(num_sampler, sizeof (void *)); /* XXX: leak */
 	memcpy(ctx->samplers[shader], sampler, num_sampler * sizeof (void *));
 
 	ctx->dirty |= PAN_DIRTY_SAMPLERS;
@@ -1612,10 +1611,8 @@ panfrost_set_sampler_views(
 
 	assert(start_slot == 0);
 
-	ctx->sampler_views[shader] = calloc(num_views, sizeof (void *)); /* XXX: leak */
-	memcpy(ctx->sampler_views[shader], views, num_views * sizeof (void *));
-
 	ctx->sampler_view_count[shader] = num_views;
+	memcpy(ctx->sampler_views[shader], views, num_views * sizeof (void *));
 
 	ctx->dirty |= PAN_DIRTY_TEXTURES;
 }
