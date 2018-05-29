@@ -207,16 +207,6 @@ scalar_alu_modifiers(nir_alu_src *src, bool full1)
 	return alu_src;
 }
 
-static unsigned 
-scalar_move_src(int component, bool full) {
-	midgard_scalar_alu_src src = {
-		.full = full,
-		.component = component << 1 /* XXX: Ditto */
-	};
-
-	return scalar_alu_srco_unsigned(src);
-}
-
 static midgard_instruction
 m_alu_vector(midgard_alu_op op, int unit, unsigned src0, midgard_vector_alu_src mod1, unsigned src1, midgard_vector_alu_src mod2, unsigned dest, bool literal_out, midgard_outmod outmod)
 {
@@ -262,7 +252,7 @@ M_LOAD(load_attr_32);
 //M_LOAD(load_vary_16);
 M_LOAD(load_vary_32);
 //M_LOAD(load_uniform_16);
-M_LOAD(load_uniform_32);
+//M_LOAD(load_uniform_32);
 //M_STORE(store_vary_16);
 M_STORE(store_vary_32);
 
@@ -806,7 +796,7 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 			offset = nir_intrinsic_base(instr) + const_offset->u32[0];
 			offset = offset * 2 + (nir_intrinsic_component(instr) / 2);
 
-			reg = nir_alu_src_index(&instr->src[0]);
+			reg = nir_src_index(&instr->src[0]);
 
 			if (ctx->stage == MESA_SHADER_FRAGMENT) {
 				/* gl_FragColor is not emitted with load/store
@@ -1955,12 +1945,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	/* Append vertex epilogue before optimisation, so the epilogue itself
 	 * is optimised */
 
-	if (ctx->stage == MESA_SHADER_VERTEX) {
-		printf("trans\n");
+	if (ctx->stage == MESA_SHADER_VERTEX)
 		transform_position_writes(nir);
-	} else {
-		printf("No trans\n");
-	}
 
 	/* Optimisation passes */
 
