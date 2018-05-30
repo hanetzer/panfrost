@@ -241,9 +241,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	for (int i = 0; i <= PIPE_SHADER_FRAGMENT; ++i)
 		ctx->constant_buffer[i].dirty = true;
 
-	/* XXX: Framebuffer update the right way */
-	trans_new_frag_framebuffer(ctx);
-
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
 }
@@ -2243,6 +2240,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);
 	trans_invalidate_frame(ctx);
+	trans_new_frag_framebuffer(ctx);
 	trans_default_shader_backend(ctx);
 	trans_generate_space_filler_indices();
 
