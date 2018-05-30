@@ -49,8 +49,8 @@ static bool FORCE_MSAA = true;
 static void
 trans_upload_varyings_descriptor(struct panfrost_context *ctx)
 {
-        mali_ptr unknown6_1_p = panfrost_upload(&ctx->cmdstream, &ctx->varyings_descriptor_0, sizeof(struct mali_unknown6), true);
-        mali_ptr unknown6_2_p = panfrost_upload_sequential(&ctx->cmdstream, &ctx->varyings_descriptor_1, sizeof(struct mali_unknown6));
+        mali_ptr unknown6_1_p = panfrost_upload(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_0, sizeof(struct mali_unknown6), true);
+        mali_ptr unknown6_2_p = panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_1, sizeof(struct mali_unknown6));
         ctx->payload_vertex.unknown6 = (unknown6_1_p) | 0x0;
         ctx->payload_tiler.unknown6 = (unknown6_2_p) | 0x8;
 }
@@ -246,7 +246,7 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
-	ctx->dirty |= PAN_DIRTY_VS | PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
+	ctx->dirty |= PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
 	ctx->dirty |= PAN_DIRTY_FS;
 }
 
@@ -810,8 +810,8 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_VS) {
 		assert(ctx->vs);
-		ctx->payload_vertex._shader_upper = panfrost_upload(&ctx->cmdstream, &ctx->vs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
-		panfrost_reserve(&ctx->cmdstream, sizeof(struct mali_fragment_core));
+		ctx->payload_vertex._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->vs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
+		panfrost_reserve(&ctx->cmdstream_persistent, sizeof(struct mali_fragment_core));
 
 		/* Varying descriptor is tied to the vertex shader. Also the
 		 * fragment shader, I suppose, but it's generated with the
@@ -2098,7 +2098,8 @@ trans_setup_hardware(struct panfrost_context *ctx)
 {
 	ctx->fd = pandev_open();
 
-	trans_allocate_slab(ctx, &ctx->cmdstream, 8*64*4, true, true, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->cmdstream, 8*64*2, true, true, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->cmdstream_persistent, 8*64*4, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->textures, 4*64*64, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->scratchpad, 16, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
