@@ -246,8 +246,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
-	ctx->dirty |= PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
-	ctx->dirty |= PAN_DIRTY_FS;
 }
 
 void
@@ -822,13 +820,13 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_FS) { 
 		assert(ctx->fs);
-		ctx->payload_tiler._shader_upper = panfrost_upload(&ctx->cmdstream, &ctx->fs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
-		panfrost_upload_sequential(&ctx->cmdstream, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
+		ctx->payload_tiler._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
+		panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VERTEX) {
 		ctx->payload_vertex.attribute_meta = panfrost_upload(&
-				ctx->cmdstream, &ctx->vertex->hw,
+				ctx->cmdstream_persistent, &ctx->vertex->hw,
 				sizeof(struct mali_attr_meta) * ctx->vertex->num_elements, false);
 	}
 
@@ -1459,8 +1457,6 @@ panfrost_set_vertex_buffers(
 		ctx->vertex_buffers = NULL;
 		ctx->vertex_buffer_count = 0;
 	}
-
-	ctx->dirty |= PAN_DIRTY_VERT_BUF;
 }
 
 static void
