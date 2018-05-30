@@ -28,7 +28,11 @@
 #include "pan_screen.h"
 #endif
 
+/* Don't use the mesa winsys; use our own X11 window with Xshm */
 #define USE_SLOWFB
+
+/* Do not actually send anything to the GPU; merely generate the cmdstream as fast as possible. Disables framebuffer writes */
+//#define DRY_RUN
 
 #define SET_BIT(lval, bit, cond) \
 	if (cond) \
@@ -1036,6 +1040,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 	ctx->draw_count = 0;
 
+#ifndef DRY_RUN
 	if (last_fragment_id != -1) {
 		/* Pipelined draws */
 		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
@@ -1088,6 +1093,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 	    printf("Error submitting\n");
 
 	last_fragment_id = atoms[1].atom_number;
+#endif
 }
 
 static void
@@ -1108,8 +1114,10 @@ panfrost_flush(
 	trans_invalidate_frame(ctx);
 
 #ifdef USE_SLOWFB
+#ifndef DRY_RUN
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->stride / 4, ctx->height);
+#endif
 #endif
 }	
 
