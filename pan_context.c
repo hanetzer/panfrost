@@ -220,7 +220,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	ctx->textures.stack_bottom = 0;
 
 	/* Regenerate payloads */
-	trans_emit_vertex_payload(ctx);
         trans_emit_tiler_payload(ctx);
 	trans_emit_vt_framebuffer(ctx);
 
@@ -243,6 +242,7 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
+	ctx->dirty |= PAN_DIRTY_VS | PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
 }
 
 void
@@ -300,17 +300,7 @@ trans_emit_vertex_payload(struct panfrost_context *ctx)
 		.gl_enables = 0x4
 	};
 
-	/* Who knows why the GPU needs this?! */
-
-        u32 inner_unknown = 0; 
-        mali_ptr inner_unknown_p = panfrost_upload(&ctx->cmdstream, &inner_unknown, 4, false);
-        u64 unknown = ((inner_unknown_p) << 8) | 1;
-        payload.unknown1 = panfrost_upload(&ctx->cmdstream, &unknown, 8, false);
-
 	memcpy(&ctx->payload_vertex, &payload, sizeof(payload));
-
-	/* Shader, vertex elements are necessarily dirtied... since we just zeroed it in the struct */
-	ctx->dirty |= PAN_DIRTY_VS | PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
 }
 
 static unsigned
@@ -2239,6 +2229,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);
+	trans_emit_vertex_payload(ctx);
 	trans_invalidate_frame(ctx);
 	trans_new_frag_framebuffer(ctx);
 	trans_default_shader_backend(ctx);
