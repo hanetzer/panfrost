@@ -220,7 +220,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	ctx->textures.stack_bottom = 0;
 
 	/* Regenerate payloads */
-        trans_emit_tiler_payload(ctx);
 	trans_emit_vt_framebuffer(ctx);
 
 	if (ctx->rasterizer)
@@ -243,6 +242,7 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
 	ctx->dirty |= PAN_DIRTY_VS | PAN_DIRTY_VERTEX | PAN_DIRTY_VERT_BUF;
+	ctx->dirty |= PAN_DIRTY_FS;
 }
 
 void
@@ -291,7 +291,7 @@ trans_attr(size_t type_sz, int columns, int vertices)
  * arbitrarily, which means these functions are basically catch-all's for
  * as-of-yet unwavering unknowns */
 
-void
+static void
 trans_emit_vertex_payload(struct panfrost_context *ctx)
 {
 	struct mali_payload_vertex_tiler payload = {
@@ -376,7 +376,7 @@ trans_translate_alt_compare_func(enum pipe_compare_func in)
 	return 0; /* Unreachable */
 }
 
-void
+static void
 trans_emit_tiler_payload(struct panfrost_context *ctx)
 {
 	struct mali_payload_vertex_tiler payload_1 = {
@@ -385,9 +385,6 @@ trans_emit_tiler_payload(struct panfrost_context *ctx)
 	};
 
 	memcpy(&ctx->payload_tiler, &payload_1, sizeof(payload_1));
-
-	/* See above */
-	ctx->dirty |= PAN_DIRTY_FS;
 }
 
 void
@@ -2230,6 +2227,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);
 	trans_emit_vertex_payload(ctx);
+	trans_emit_tiler_payload(ctx);
 	trans_invalidate_frame(ctx);
 	trans_new_frag_framebuffer(ctx);
 	trans_default_shader_backend(ctx);

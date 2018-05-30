@@ -229,12 +229,6 @@ void
 trans_default_shader_backend(struct panfrost_context *ctx);
 
 void
-trans_emit_vertex_payload(struct panfrost_context *ctx);
-
-void
-trans_emit_tiler_payload(struct panfrost_context *ctx);
-
-void
 trans_emit_vt_framebuffer(struct panfrost_context *ctx);
 
 struct mali_single_framebuffer trans_emit_fbd(struct panfrost_context *ctx);
