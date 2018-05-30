@@ -1022,6 +1022,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 #ifndef DRY_RUN
 	if (last_fragment_id != -1) {
+#if 0
 		/* Pipelined draws */
 		struct pollfd ufd = {
 			.fd = ctx->fd,
@@ -1030,13 +1031,12 @@ trans_submit_frame(struct panfrost_context *ctx)
 		};
 
 		poll(&ufd, 1, 16);
+#endif
 
-#if 0
 		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
 		do {
 			read(ctx->fd, ev, sizeof(ev));
 		} while (ev[4] != last_fragment_id);
-#endif
 	}
 
 	mali_external_resource framebuffer[] = {
