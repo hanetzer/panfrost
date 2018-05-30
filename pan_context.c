@@ -233,9 +233,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	if (ctx->rasterizer)
 		ctx->dirty |= PAN_DIRTY_RASTERIZER;
 
-	/* XXX: We wouldn't need to upload this every frame if we were clever about tracking */
-	trans_upload_varyings_descriptor(ctx);
-
 	/* Viewport */
 	/* XXX: Galliumify for realsies */
 
