@@ -202,6 +202,14 @@ panfrost_clear(
 	fbd->clear_flags = clear_flags;
 }
 
+static void
+trans_attach_vt_framebuffer(struct panfrost_context *ctx)
+{
+	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(struct mali_single_framebuffer), false);
+	ctx->payload_vertex.framebuffer = framebuffer_1_p;
+	ctx->payload_tiler.framebuffer = framebuffer_1_p;
+}
+
 /* Reset per-frame context, called on context initialisation as well as after
  * flushing a frame */
 
@@ -220,7 +228,7 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 	ctx->textures.stack_bottom = 0;
 
 	/* Regenerate payloads */
-	trans_emit_vt_framebuffer(ctx);
+	trans_attach_vt_framebuffer(ctx);
 
 	if (ctx->rasterizer)
 		ctx->dirty |= PAN_DIRTY_RASTERIZER;
@@ -385,15 +393,6 @@ trans_emit_tiler_payload(struct panfrost_context *ctx)
 	};
 
 	memcpy(&ctx->payload_tiler, &payload_1, sizeof(payload_1));
-}
-
-void
-trans_emit_vt_framebuffer(struct panfrost_context *ctx)
-{
-	struct mali_single_framebuffer framebuffer_1 = trans_emit_fbd(ctx);
-	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &framebuffer_1, sizeof(framebuffer_1), false);
-	ctx->payload_vertex.framebuffer = framebuffer_1_p;
-	ctx->payload_tiler.framebuffer = framebuffer_1_p;
 }
 
 static bool
@@ -2226,6 +2225,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);
+	ctx->vt_framebuffer = trans_emit_fbd(ctx);
 	trans_emit_vertex_payload(ctx);
 	trans_emit_tiler_payload(ctx);
 	trans_invalidate_frame(ctx);

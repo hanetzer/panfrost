@@ -128,6 +128,7 @@ struct panfrost_context {
 	struct mali_unknown6 varyings_descriptor_1;
 
 	struct mali_viewport viewport;
+	struct mali_single_framebuffer vt_framebuffer;
 
 	/* TODO: Multiple uniform buffers (index =/= 0), finer updates? */
 
@@ -227,9 +228,6 @@ panfrost_context(struct pipe_context *pcontext)
 
 void
 trans_default_shader_backend(struct panfrost_context *ctx);
-
-void
-trans_emit_vt_framebuffer(struct panfrost_context *ctx);
 
 struct mali_single_framebuffer trans_emit_fbd(struct panfrost_context *ctx);
 
