@@ -12,6 +12,8 @@
  *
  */
 
+#include <sys/poll.h>
+
 #include "pan_context.h"
 #include "pan_swizzle.h"
 
@@ -1021,8 +1023,15 @@ trans_submit_frame(struct panfrost_context *ctx)
 #ifndef DRY_RUN
 	if (last_fragment_id != -1) {
 		/* Pipelined draws */
-		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
+		struct pollfd ufd = {
+			.fd = ctx->fd,
+			.events = POLLIN | POLLOUT,
+			.revents = 0
+		};
 
+		poll(&ufd, 1, 16);
+
+		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
 		do {
 			read(ctx->fd, ev, sizeof(ev));
 		} while (ev[4] != last_fragment_id);
