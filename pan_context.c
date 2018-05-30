@@ -1031,10 +1031,12 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 		poll(&ufd, 1, 16);
 
+#if 0
 		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
 		do {
 			read(ctx->fd, ev, sizeof(ev));
 		} while (ev[4] != last_fragment_id);
+#endif
 	}
 
 	mali_external_resource framebuffer[] = {
