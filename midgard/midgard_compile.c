@@ -905,6 +905,9 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 			.in_reg_full = 1,
 			.out_full = 1,
 
+			/* TODO: RA on tex file */
+			.out_reg_select = 1,
+
 			.filter = 1,
 			
 			/* Always 1 */
@@ -930,7 +933,9 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 
 	/* Emit a move for the destination as well TODO eliminate */
 	
-	EMIT(fmov, SSA_FIXED_REGISTER(REGISTER_TEXTURE_BASE), blank_alu_src, nir_dest_index(&instr->dest), false, midgard_outmod_none);
+	EMIT(fmov, SSA_FIXED_REGISTER(REGISTER_TEXTURE_BASE + 1), blank_alu_src, nir_dest_index(&instr->dest), false, midgard_outmod_none);
+	//alias_ssa(ctx, nir_dest_index(&instr->dest), SSA_FIXED_REGISTER(REGISTER_TEXTURE_BASE + 1), false);
+	//^^ does not work due to overwriting with multiple tex ops, FIXME
 
 	/* Used for .cont and .last hinting */
 	ctx->texture_op_count++;
