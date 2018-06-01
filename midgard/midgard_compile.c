@@ -1432,7 +1432,7 @@ skip_instruction:
 
 			bool filled_next = false;
 
-			if ((ins + 1)->type == TAG_LOAD_STORE_4) {
+			if (IN_ARRAY(ins + 1, ctx->current_block) && ((ins + 1)->type == TAG_LOAD_STORE_4)) {
 				midgard_load_store_word next = (ins + 1)->load_store;
 
 				/* As the two operate concurrently, make sure
