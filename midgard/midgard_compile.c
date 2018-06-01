@@ -1653,6 +1653,21 @@ embedded_to_inline_constant(compiler_context *ctx)
 		if (ins->ssa_args.src1 == SSA_FIXED_REGISTER(REGISTER_CONSTANT)) {
 			int component = 0;
 
+			/* Scale constant appropriately, if we can legally */
+			uint16_t scaled_constant = 0;
+
+			/* XXX: Check legality */
+			if (midgard_is_integer_op(op)) {
+				unsigned int *iconstants = (unsigned int *) ins->constants;
+				scaled_constant = (uint16_t) iconstants[component];
+
+				/* Constant overflow after resize */
+				if (scaled_constant != iconstants[component])
+				       break;
+			} else {
+				scaled_constant = _mesa_float_to_half((float) ins->constants[component]);
+			}
+
 			if (ins->vector) {
 				midgard_vector_alu_src *src;
 				int q = ins->vector_alu.src2;
@@ -1696,17 +1711,6 @@ embedded_to_inline_constant(compiler_context *ctx)
 				assert(src->full);
 
 				component = src->component;
-			}
-
-			/* Scale constant appropriately, if we can legally */
-			uint16_t scaled_constant = 0;
-
-			/* XXX: Check legality, width */
-			if (midgard_is_integer_op(op)) {
-				int *iconstants = (int *) ins->constants;
-				scaled_constant = (uint16_t) iconstants[component];
-			} else {
-				scaled_constant = _mesa_float_to_half((float) ins->constants[component]);
 			}
 
 			/* Get rid of the embedded constant */
