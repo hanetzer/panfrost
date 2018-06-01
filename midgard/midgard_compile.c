@@ -1203,18 +1203,20 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 
 				/* According to the presentation "The ARM
 				 * Mali-T880 Mobile GPU" from HotChips 27,
-				 * there are two pipeline stages. Lines are executed in parallel: 
+				 * there are two pipeline stages. Branching
+				 * position determined experimentally. Lines
+				 * are executed in parallel: 
 				 *
 				 * [ VMUL ] [ SADD ]
-				 * [ VADD ] [ SMUL ] [ LUT ]
+				 * [ VADD ] [ SMUL ] [ LUT ] [ BRANCH ]
 				 *
 				 * Verify that there are no ordering dependencies here.
 				 *
 				 * TODO: Allow for parallelism!!!
 				 */
 
-				if (last_unit >= ALU_ENAB_VEC_ADD && ains->unit >= ALU_ENAB_VEC_ADD
-						&& ains->unit < ALU_ENAB_BR_COMPACT) break;
+				if (last_unit >= ALU_ENAB_VEC_ADD && ains->unit >= ALU_ENAB_VEC_ADD)
+					break;
 
 				if (last_unit && last_unit < ALU_ENAB_VEC_ADD && ains->unit < ALU_ENAB_VEC_ADD) {
 					/* It may be possible to switch the
