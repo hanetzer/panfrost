@@ -1980,6 +1980,15 @@ panfrost_set_polygon_stipple(struct pipe_context *pipe,
 }
 
 static void
+panfrost_set_active_query_state(struct pipe_context *pipe,
+                             boolean enable)
+{
+   //struct panfrost_context *panfrost = panfrost_context(pipe);
+}
+
+
+
+static void
 panfrost_destroy(struct pipe_context *pipe)
 {
 	struct panfrost_context *panfrost = panfrost_context(pipe);
@@ -2297,6 +2306,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	gallium->set_viewport_states = panfrost_set_viewport_states;
 	gallium->set_scissor_states = panfrost_set_scissor_states;
 	gallium->set_polygon_stipple = panfrost_set_polygon_stipple;
+	gallium->set_active_query_state = panfrost_set_active_query_state;
 
 	gallium->blit = panfrost_blit;
 
