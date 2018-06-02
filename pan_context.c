@@ -1795,7 +1795,10 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 	/* TODO: Move to CSO create for perf improvement */
 	if (!trans_make_fixed_blend_mode(&blend->rt[0], &ctx->fragment_shader_core.blend_equation)) {
 		printf("ERROR: Blend shaders not yet implemented\n");
-		assert(0);
+		/* TODO: Handle */
+		if (!trans_make_fixed_blend_mode(&default_blend, &ctx->fragment_shader_core.blend_equation))
+			printf("ERROR: Default shader backend must not trigger blend shader\n");
+		//assert(0);
 	}
 
 	/* Shader itself is not dirty, but the shader core is */
