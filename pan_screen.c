@@ -81,7 +81,9 @@ panfrost_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_OCCLUSION_QUERY:
    case PIPE_CAP_QUERY_TIME_ELAPSED:
    case PIPE_CAP_QUERY_PIPELINE_STATISTICS:
-      return 0; /* TODO: Queries */
+      /* We lie about supporting queries so we can pretend to be OpenGL 2.0
+       * compliant (desktop GL) */
+      return 1; /* TODO: Queries */
    case PIPE_CAP_TEXTURE_MIRROR_CLAMP:
       return 1;
    case PIPE_CAP_TEXTURE_SWIZZLE:
