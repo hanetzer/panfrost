@@ -576,7 +576,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			 * shifted over one from NIR */
 
 			/* XXX: Force component correct */
-			int condition = nir_src_index(instr->src[0].src);
+			int condition = nir_src_index(&instr->src[0].src);
 
 			const midgard_vector_alu_src alu_src = {
 				.swizzle = SWIZZLE(COMPONENT_X, COMPONENT_X, COMPONENT_X, COMPONENT_X),
