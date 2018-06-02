@@ -345,7 +345,7 @@ panfrost_get_shader_param(struct pipe_screen *screen,
                 return 0; /* XXX */
 
         case PIPE_SHADER_CAP_MAX_INPUTS:
-                return 8;
+                return 16;
         case PIPE_SHADER_CAP_MAX_OUTPUTS:
                 return shader == PIPE_SHADER_FRAGMENT ? 1 : 8;
         case PIPE_SHADER_CAP_MAX_TEMPS:
