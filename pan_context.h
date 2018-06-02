@@ -29,6 +29,7 @@
 #include "pipe/p_format.h"
 #include "pipe/p_screen.h"
 #include "pipe/p_state.h"
+#include "util/u_blitter.h"
 #else
 #include "extrapipe/pipe.h"
 #endif
@@ -153,6 +154,15 @@ struct panfrost_context {
 	int sampler_view_count[PIPE_SHADER_TYPES];
 
 	struct primconvert_context *primconvert;
+#ifdef HAVE_DRI3
+	struct blitter_context *blitter;
+#endif
+
+	struct pipe_viewport_state *viewports;
+	struct pipe_scissor_state *scissors;
+	struct pipe_blend_state *blend;
+	struct pipe_depth_stencil_alpha_state *depth_stencil;
+	struct pipe_stencil_ref *stencil_ref;
 };
 
 /* Corresponds to the CSO */

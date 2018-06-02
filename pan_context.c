@@ -1525,6 +1525,8 @@ panfrost_set_stencil_ref(
 {
 	struct panfrost_context *ctx = panfrost_context(pctx);
 
+	ctx->stencil_ref = ref;
+
 	ctx->fragment_shader_core.stencil_front.ref = ref->ref_value[0];
 	ctx->fragment_shader_core.stencil_back.ref = ref->ref_value[1];
 
@@ -1777,6 +1779,7 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
 	struct pipe_blend_state *blend = (struct pipe_blend_state *) cso;
+	ctx->blend = blend;
 
 	if (!blend)
 		return;
@@ -1826,6 +1829,7 @@ panfrost_bind_depth_stencil_state(struct pipe_context *pipe,
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
 	const struct pipe_depth_stencil_alpha_state *depth_stencil = cso;
+	ctx->depth_stencil = depth_stencil;
 
 	if (!depth_stencil)
 		return;
@@ -1929,7 +1933,7 @@ panfrost_set_viewport_states(struct pipe_context *pipe,
                              unsigned num_viewports,
                              const struct pipe_viewport_state *viewports)
 {
-	//struct panfrost_context *panfrost = panfrost_context(pipe);
+	struct panfrost_context *ctx = panfrost_context(pipe);
 
 	assert(start_slot == 0);
 	assert(num_viewports == 1);
@@ -1937,6 +1941,8 @@ panfrost_set_viewport_states(struct pipe_context *pipe,
 	const struct pipe_viewport_state *vp = &viewports[0];
 	printf("Scale: %f, %f, %f\n", vp->scale[0], vp->scale[1], vp->scale[2]);
 	printf("Translate: %f, %f, %f\n", vp->translate[0], vp->translate[1], vp->translate[2]);
+
+	ctx->viewports = viewports;
 
 	/* TODO */
 }
@@ -1955,6 +1961,8 @@ panfrost_set_scissor_states(struct pipe_context *pipe,
 	const struct pipe_scissor_state *ss = &scissors[0];
 	printf("(%d, %d) -> (%d, %d)\n", ss->minx, ss->miny, ss->maxx, ss->maxy);
 
+	ctx->scissors = scissors;
+
 	/* TODO */
         trans_viewport(ctx, 0.0, 1.0, ss->minx, ss->miny, ss->maxx, ss->maxy);
 	ctx->dirty |= PAN_DIRTY_VIEWPORT;
@@ -1971,8 +1979,12 @@ panfrost_set_polygon_stipple(struct pipe_context *pipe,
 static void
 panfrost_destroy(struct pipe_context *pipe)
 {
-   //struct panfrost_context *panfrost = panfrost_context(pipe);
-   /* TODO */
+	struct panfrost_context *panfrost = panfrost_context(pipe);
+
+#ifdef HAVE_DRI3
+	if (panfrost->blitter)
+		util_blitter_destroy(panfrost->blitter);
+#endif
 }
 
 static void
@@ -2016,6 +2028,72 @@ panfrost_transfer_unmap(struct pipe_context *pctx,
 
 	/* Transfer itself is CALLOCed at the moment */
 	free(transfer);
+}
+
+static void panfrost_blit(struct pipe_context *pipe,
+                    const struct pipe_blit_info *info)
+{
+   struct panfrost_context *pan = panfrost_context(pipe);
+
+   /* STUB */
+   printf("Skipping blit XXX\n");
+   return;
+#if 0
+
+#if 0
+   if (info->render_condition_enable && !panfrost_check_render_cond(pan))
+      return;
+#endif
+
+   if (info->src.resource->nr_samples > 1 &&
+       info->dst.resource->nr_samples <= 1 &&
+       !util_format_is_depth_or_stencil(info->src.resource->format) &&
+       !util_format_is_pure_integer(info->src.resource->format)) {
+      printf("panfrost: color resolve unimplemented\n");
+      return;
+   }
+
+   if (util_try_blit_via_copy_region(pipe, info)) {
+      return; /* done */
+   }
+
+   if (!util_blitter_is_blit_supported(pan->blitter, info)) {
+      debug_printf("panfrost: blit unsupported %s -> %s\n",
+                   util_format_short_name(info->src.resource->format),
+                   util_format_short_name(info->dst.resource->format));
+      return;
+   }
+
+   /* XXX turn off occlusion and streamout queries */
+
+   util_blitter_save_vertex_buffer_slot(pan->blitter, pan->vertex_buffers);
+   util_blitter_save_vertex_elements(pan->blitter, pan->vertex->pipe);
+   util_blitter_save_vertex_shader(pan->blitter, pan->vs);
+   //util_blitter_save_geometry_shader(pan->blitter, pan->gs);
+   //util_blitter_save_so_targets(pan->blitter, pan->num_so_targets,
+   //                  (struct pipe_stream_output_target**)pan->so_targets);
+   util_blitter_save_rasterizer(pan->blitter, pan->rasterizer);
+   util_blitter_save_viewport(pan->blitter, pan->viewports);
+   util_blitter_save_scissor(pan->blitter, pan->scissors);
+   util_blitter_save_fragment_shader(pan->blitter, pan->fs);
+   util_blitter_save_blend(pan->blitter, pan->blend);
+   util_blitter_save_depth_stencil_alpha(pan->blitter, pan->depth_stencil);
+   util_blitter_save_stencil_ref(pan->blitter, &pan->stencil_ref);
+   /*util_blitter_save_sample_mask(pan->blitter, pan->sample_mask);*/
+   util_blitter_save_framebuffer(pan->blitter, &pan->pipe_framebuffer);
+   util_blitter_save_fragment_sampler_states(pan->blitter,
+                     pan->sampler_count[PIPE_SHADER_FRAGMENT],
+                     (void**)pan->samplers[PIPE_SHADER_FRAGMENT]);
+   util_blitter_save_fragment_sampler_views(pan->blitter,
+                     pan->sampler_view_count[PIPE_SHADER_FRAGMENT],
+                     pan->sampler_views[PIPE_SHADER_FRAGMENT]);
+#if 0
+   util_blitter_save_render_condition(pan->blitter, pan->render_cond_query,
+                                      pan->render_cond_cond, pan->render_cond_mode);
+#endif
+
+   util_blitter_blit(pan->blitter, info);
+#endif
 }
 
 static void
@@ -2217,6 +2295,8 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	gallium->set_scissor_states = panfrost_set_scissor_states;
 	gallium->set_polygon_stipple = panfrost_set_polygon_stipple;
 
+	gallium->blit = panfrost_blit;
+
 #ifdef HAVE_DRI3
 	/* XXX: leaks */
 	gallium->stream_uploader = u_upload_create_default(gallium);
@@ -2226,6 +2306,9 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	ctx->primconvert = util_primconvert_create(gallium,
 			(1 << PIPE_PRIM_QUADS) - 1);
 	assert(ctx->primconvert);
+
+	ctx->blitter = util_blitter_create(gallium);
+	assert(ctx->blitter);
 #endif
 
 	/* Prepare for render! */
