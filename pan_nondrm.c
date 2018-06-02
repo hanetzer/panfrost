@@ -24,6 +24,7 @@
 
 /* From the kernel module */
 
+#define USE_LEGACY_KERNEL
 #define MALI_MEM_MAP_TRACKING_HANDLE (3ull << 12)
 
 int
@@ -60,9 +61,9 @@ pandev_open()
 {
 
 	int fd = open("/dev/mali0", O_RDWR | O_NONBLOCK | O_CLOEXEC);
-	assert(fd);
+	assert(fd != -1);
 
-#if 0
+#ifdef USE_LEGACY_KERNEL
 	struct mali_ioctl_get_version version = { .major = 10, .minor = 4 };
 	struct mali_ioctl_set_flags args = {};
 
