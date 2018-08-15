@@ -178,6 +178,7 @@ int main(int argc, const char **argv)
         union pipe_color_union u = { .f = { 0.1, 0.1, 0.1, 1.0 } };
         gallium->clear(gallium, PIPE_CLEAR_COLOR | PIPE_CLEAR_DEPTH | PIPE_CLEAR_STENCIL, &u, 0.0, 0.0);
 
+#if 0
 	struct pipe_draw_info info = {
 		.start = 0,
 		.count = 9,
@@ -187,6 +188,7 @@ int main(int argc, const char **argv)
 	};
 
 	gallium->draw_vbo(gallium, &info);
+#endif
 
 	/*
 	attributes_data_1_0[0] = 0;
