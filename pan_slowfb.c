@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include "pan_slowfb.h"
 
-#define USE_SHM
+//#define USE_SHM
 
 #ifndef __ANDROID__
 
