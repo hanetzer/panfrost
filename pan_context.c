@@ -2165,6 +2165,7 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	/* Unclear why framebuffers are offset like this */
 	int offset = (ctx->stride - 256) * ctx->bytes_per_pixel;
 
+#if 0
 	if (addr) {
 		ctx->framebuffer.cpu = (uint8_t *) addr;
 	} else {
@@ -2175,7 +2176,9 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 		ctx->framebuffer.cpu = info.framebuffer;
 		ctx->stride = info.stride;
 	}
+#endif
 
+#if 0
 	struct mali_mem_import_user_buffer framebuffer_handle = { .ptr = (uint64_t) (uintptr_t) ctx->framebuffer.cpu, .length = framebuffer_sz + offset };
 
 	struct mali_ioctl_mem_import framebuffer_import = {
@@ -2185,9 +2188,16 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	};
 
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
+#endif
+	/* TODO: Reenable imports when we understand the new kernel API */
 
-	ctx->framebuffer.gpu = framebuffer_import.gpu_va;
-	ctx->framebuffer.size = ctx->stride * ctx->height;
+	trans_allocate_slab(ctx, &ctx->framebuffer, ctx->stride * ctx->height / 4096, true, true, 0, 0, 0);
+	printf("%llx\n", ctx->framebuffer.gpu);
+	struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
+	ctx->stride = info.stride;
+
+	//ctx->framebuffer.gpu = framebuffer_import.gpu_va;
+	//ctx->framebuffer.size = ctx->stride * ctx->height;
 }
 
 static void
