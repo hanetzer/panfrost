@@ -782,25 +782,111 @@ struct mali_single_framebuffer {
 	/* More below this, maybe */
 } __attribute__((packed));
 
-/* Multi? Framebuffer Descriptor */
+struct bifrost_render_target {
+	u32 unk1; // = 0x4000000
+	u32 format;
 
-struct mali_tentative_mfbd {
-	u64 blah; /* XXX: what the fuck is this? */
-	/* This GPU address is unknown, except for the fact there's something
-	 * executable here... */
-	u64 ugaT;
-	u32 block1[10];
-	u32 unknown1;
-	u32 flags;
-	u8 block2[16];
-	u64 heap_free_address;
-	u64 unknown2;
-	u32 weights[MALI_FBD_HIERARCHY_WEIGHTS];
-	u64 unknown_gpu_addressN;
-	u8 block3[88];
-	u64 unknown_gpu_address;
-	u64 unknown3;
-	u8 block4[40];
+	u64 zero1;
+
+	/* Stuff related to ARM Framebuffer Compression. When AFBC is enabled,
+	 * there is an extra metadata buffer that contains 16 bytes per tile.
+	 * The framebuffer needs to be the same size as before, since we don't
+	 * know ahead of time how much space it will take up. The
+	 * framebuffer_stride is set to 0, since the data isn't stored linearly
+	 * anymore.
+	 */
+
+	mali_ptr afbc_metadata;
+	u32 afbc_stride; // stride in units of tiles
+	u32 afbc_unk; // = 0x20000
+
+	mali_ptr framebuffer;
+
+	u32 zero2 : 4;
+	u32 framebuffer_stride : 28; // in units of bytes
+	u32 zero3;
+
+	u32 clear_color_1; // RGBA8888 from glClear, actually used by hardware
+	u32 clear_color_2; // always equal, but unclear function?
+	u32 clear_color_3; // always equal, but unclear function?
+	u32 clear_color_4; // always equal, but unclear function?
+} __attribute__((packed));
+
+/* An optional part of bifrost_framebuffer. It comes between the main structure
+ * and the array of render targets. It must be included if any of these are
+ * enabled:
+ *
+ * - Transaction Elimination
+ * - Depth/stencil
+ * - TODO: Anything else?
+ */
+
+struct bifrost_fb_extra {
+	mali_ptr checksum;
+	/* Each tile has an 8 byte checksum, so the stride is "width in tiles * 8" */
+	u32 checksum_stride;
+
+	u32 unk;
+
+	union {
+		/* Note: AFBC is only allowed for 24/8 combined depth/stencil. */
+		struct {
+			mali_ptr depth_stencil_afbc_metadata;
+			u32 depth_stencil_afbc_stride; // in units of tiles
+			u32 zero1;
+
+			mali_ptr depth_stencil;
+
+			u64 padding;
+		} ds_afbc;
+
+		struct {
+			/* Depth becomes depth/stencil in case of combined D/S */
+			mali_ptr depth;
+			u32 depth_stride_zero : 4;
+			u32 depth_stride : 28;
+			u32 zero1;
+
+			mali_ptr stencil;
+			u32 stencil_stride_zero : 4;
+			u32 stencil_stride : 28;
+			u32 zero2;
+		} ds_linear;
+	};
+
+
+	u64 zero3, zero4;
+} __attribute__((packed));
+
+/* flags for unk3 */
+#define MALI_MFBD_EXTRA (1 << 13)
+
+struct bifrost_framebuffer {
+	u32 unk0; // = 0x10
+	u32 zero1;
+	u64 zero2;
+	/* 0x10 */
+	mali_ptr sample_locations;
+	mali_ptr unknown1;
+	/* 0x20 */
+	u16 width1, height1;
+	u32 zero3;
+	u16 width2, height2;
+	u32 unk1 : 19; // = 0x01000
+	u32 rt_count_1 : 2; // off-by-one (use MALI_POSITIVE)
+	u32 unk2 : 3; // = 0
+	u32 rt_count_2 : 3; // no off-by-one
+	u32 zero4 : 5;
+	/* 0x30 */
+	u32 clear_stencil : 8;
+	u32 unk3 : 24; // = 0x100
+	float clear_depth;
+	mali_ptr tiler_meta;
+	/* 0x40 */
+	u64 zero5, zero6, zero7, zero8, zero9, zero10, zero11, zero12;
+
+	/* optional: struct bifrost_fb_extra extra */
+	/* struct bifrost_render_target rts[] */
 } __attribute__((packed));
 
 /* Originally from chai, which found it from mali_kase_reply.c */
