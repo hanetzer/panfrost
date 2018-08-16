@@ -166,11 +166,7 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 		.afbc_stride = 0,
 		.afbc_unk = 0x0,
 		.framebuffer = ctx->framebuffer.gpu,
-		.framebuffer_stride = /*268435356*/100,
-		.clear_color_1 = 0x664c331a,
-		.clear_color_2 = 0x664c331a,
-		.clear_color_3 = 0x664c331a,
-		.clear_color_4 = 0x664c331a,
+		.framebuffer_stride = ctx->width / 4,
 	};
 
 	memcpy(&ctx->fragment_rts[0], &rt, sizeof(rt));
@@ -197,7 +193,6 @@ panfrost_clear(
 	bool clear_color = buffers & PIPE_CLEAR_COLOR;
 	bool clear_depth = buffers & PIPE_CLEAR_DEPTH;
 	bool clear_stencil = buffers & PIPE_CLEAR_STENCIL;
-
 
 	/* Remember that we've done something */
 	ctx->dirty |= PAN_DIRTY_DUMMY;
@@ -226,7 +221,6 @@ panfrost_clear(
 		buffer_color->clear_color_3 = packed_color;
 		buffer_color->clear_color_4 = packed_color;
 	}
-
 
 	/* TODO: MFBD depth/stencil */
 #ifdef SFBD
@@ -797,7 +791,6 @@ trans_fragment_job(struct panfrost_context *ctx)
 
 	/* Upload (single) render target */
 	mali_ptr rt = panfrost_upload(&ctx->cmdstream, &ctx->fragment_rts[0], sizeof(struct bifrost_render_target) * 1, true);
-	printf("%llx, %llx\n", fbd, rt);
 
 	/* Generate the fragment (frame) job */
 
@@ -1125,7 +1118,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 			.nr_ext_res = 1,
 			.ext_res_list = framebuffer,
 			.atom_number = allocate_atom(),
-			.compat_core_req = MALI_JD_REQ_FS | /*MALI_JD_REQ_EXTERNAL_RESOURCES | */MALI_JD_REQ_SKIP_CACHE_START
+			.compat_core_req = MALI_JD_REQ_FS /*| MALI_JD_REQ_EXTERNAL_RESOURCES | MALI_JD_REQ_SKIP_CACHE_START*/
 		},
 	};
 
@@ -1176,7 +1169,11 @@ panfrost_flush(
 #ifdef USE_SLOWFB
 #ifndef DRY_RUN
 	/* Display the frame in our cute little window */
-	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->stride / 4, ctx->height);
+	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
+	for(int i = 0; i < 100; ++i) {
+		printf("%X ", ctx->framebuffer.cpu[i]);
+	}
+	printf("\n");
 #endif
 #endif
 }	
@@ -2223,7 +2220,7 @@ void
 trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width, int height)
 {
 	ctx->width = width;
-	ctx->height = height - 2;
+	ctx->height = height;
 	ctx->bytes_per_pixel = 4; /* RGB32 */
 	ctx->has_alpha_channel = false;
 	ctx->flip_vertical = true; /* OpenGL */
@@ -2264,10 +2261,13 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 #endif
 	/* TODO: Reenable imports when we understand the new kernel API */
 
-	trans_allocate_slab(ctx, &ctx->framebuffer, ctx->stride * ctx->height / 4096, true, true, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
 	printf("%llx\n", ctx->framebuffer.gpu);
+	printf("rw: %d\n", rw);
 	struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
 	ctx->stride = info.stride;
+	printf("stride: %d\n", info.stride);
+	printf("size: %d = %d x %d x %d\n", ctx->framebuffer.size, ctx->bytes_per_pixel, rw, ctx->height);
 
 	//ctx->framebuffer.gpu = framebuffer_import.gpu_va;
 	//ctx->framebuffer.size = ctx->stride * ctx->height;
