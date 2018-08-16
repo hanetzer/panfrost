@@ -194,17 +194,13 @@ panfrost_clear(
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
 
-	struct mali_single_framebuffer *fbd = &ctx->fragment_fbd;
-
-	/* Remember that we've done something */
-	ctx->dirty |= PAN_DIRTY_DUMMY;
-
-	printf("TODO: clear mfbd\n");
-	return;
-
 	bool clear_color = buffers & PIPE_CLEAR_COLOR;
 	bool clear_depth = buffers & PIPE_CLEAR_DEPTH;
 	bool clear_stencil = buffers & PIPE_CLEAR_STENCIL;
+
+
+	/* Remember that we've done something */
+	ctx->dirty |= PAN_DIRTY_DUMMY;
 
 	/* Alpha clear only meaningful without alpha channel */
 	float clear_alpha = ctx->has_alpha_channel ? color->f[3] : 1.0f;
@@ -215,15 +211,26 @@ panfrost_clear(
 		(normalised_float_to_u8(color->f[1]) <<  8) |
 		(normalised_float_to_u8(color->f[0]) <<  0);
 
-	/* Fields duplicated 4x for unknown reasons. Same in Utgard, too, which
-	 * is doubly weird. */
+#ifdef MFBD
+	struct bifrost_render_target* buffer_color = &ctx->fragment_rts[0];
+#else
+	struct mali_single_framebuffer* buffer_color = &ctx->fragment_fbd;
+#endif
 
 	if (clear_color) {
-		fbd->clear_color_1 = packed_color;
-		fbd->clear_color_2 = packed_color;
-		fbd->clear_color_3 = packed_color;
-		fbd->clear_color_4 = packed_color;
+		/* Fields duplicated 4x for unknown reasons. Same in Utgard,
+		 * too, which is doubly weird. */
+
+		buffer_color->clear_color_1 = packed_color;
+		buffer_color->clear_color_2 = packed_color;
+		buffer_color->clear_color_3 = packed_color;
+		buffer_color->clear_color_4 = packed_color;
 	}
+
+
+	/* TODO: MFBD depth/stencil */
+#ifdef SFBD
+	struct mali_single_framebuffer *fbd = &ctx->fragment_fbd;
 
 	if (clear_depth) {
 		fbd->depth_buffer = ctx->depth_stencil_buffer;
@@ -258,6 +265,7 @@ panfrost_clear(
 	}
 
 	fbd->clear_flags = clear_flags;
+#endif
 }
 
 static void
