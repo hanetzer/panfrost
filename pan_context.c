@@ -1054,7 +1054,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 			.nr_ext_res = 1,
 			.ext_res_list = framebuffer,
 			.atom_number = allocate_atom(),
-			.compat_core_req = MALI_JD_REQ_FS | MALI_JD_REQ_EXTERNAL_RESOURCES | MALI_JD_REQ_SKIP_CACHE_START
+			.compat_core_req = MALI_JD_REQ_FS | /*MALI_JD_REQ_EXTERNAL_RESOURCES | */MALI_JD_REQ_SKIP_CACHE_START
 		},
 	};
 
@@ -2136,10 +2136,12 @@ trans_allocate_slab(struct panfrost_context *ctx,
 
 	mem->size = pages * 4096;
 
+	/* mmap for 64-bit, mmap64 for 32-bit. ironic, I know */
 	if (mapped)
-		mem->cpu = mmap64(NULL, mem->size, 3, 1, ctx->fd, mem->gpu);
+		mem->cpu = mmap(NULL, mem->size, 3, 1, ctx->fd, mem->gpu);
 
 	mem->stack_bottom = 0;
+	printf("%p, %llx\n", mem->cpu, mem->gpu);
 }
 
 /* Setups a framebuffer, either by itself (with the independent slow-fb

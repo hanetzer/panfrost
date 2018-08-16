@@ -15,6 +15,7 @@ int main(int argc, const char **argv)
 	struct pipe_screen *screen = &_screen;
 	struct pipe_context *gallium = panfrost_create_context(screen, NULL, 0);
 
+#if 0
 	struct pipe_shader_state vs_cso, fs_cso;
 
 	gallium->bind_fs_state(gallium, gallium->create_fs_state(gallium, &fs_cso));
@@ -158,8 +159,10 @@ int main(int argc, const char **argv)
 			PIPE_SHADER_FRAGMENT,
 			0, 2,
 			(struct pipe_sampler_view **) texs);
+#endif
 
-    for (int i = 0; i < 3000; ++i) {
+    for (int i = 0; i < 1; ++i) {
+#if 0
 	const struct pipe_rasterizer_state stat = {
 		.line_width = 10.0f,
 		.front_ccw = false,
@@ -174,6 +177,7 @@ int main(int argc, const char **argv)
 	memcpy(attrib_trans,
 		attributes_data_1_0,
 		sizeof(attributes_data_1_0));
+#endif
 
         union pipe_color_union u = { .f = { 0.1, 0.1, 0.1, 1.0 } };
         gallium->clear(gallium, PIPE_CLEAR_COLOR | PIPE_CLEAR_DEPTH | PIPE_CLEAR_STENCIL, &u, 0.0, 0.0);
@@ -218,7 +222,7 @@ int main(int argc, const char **argv)
 	gallium->flush(gallium, NULL, PIPE_FLUSH_END_OF_FRAME);
     }
 
-    gallium->transfer_unmap(gallium, transfer);
+    //gallium->transfer_unmap(gallium, transfer);
 
     return 0;
 }
