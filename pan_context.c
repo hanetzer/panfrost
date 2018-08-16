@@ -64,7 +64,8 @@ trans_set_framebuffer_msaa(struct panfrost_context *ctx, bool enabled)
 {
 	SET_BIT(ctx->fragment_shader_core.unknown2_3, MALI_HAS_MSAA, enabled);
 	SET_BIT(ctx->fragment_shader_core.unknown2_4, MALI_NO_MSAA, !enabled);
-	SET_BIT(ctx->fragment_fbd.format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
+	//SET_BIT(ctx->fragment_fbd.format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
+	/* XXX: T8xx */
 }
 
 /* Framebuffer descriptor */
@@ -83,9 +84,14 @@ trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int 
 	fb->resolution_check = ((w + h) / 3) << 4;
 }
 
+#ifdef SFBD
 struct mali_single_framebuffer
+#else
+struct bifrost_framebuffer
+#endif
 trans_emit_fbd(struct panfrost_context *ctx)
 {
+#ifdef SFBD
     struct mali_single_framebuffer framebuffer = {
 	    .unknown2 = 0x1f,
 	    .format = 0x30000000,
@@ -99,6 +105,32 @@ trans_emit_fbd(struct panfrost_context *ctx)
     };
 
     trans_set_framebuffer_resolution(&framebuffer, ctx->width, ctx->height);
+#else
+	struct bifrost_framebuffer framebuffer = {
+		.tiler_meta = 0x100000000200,
+
+		.width1 = MALI_POSITIVE(400),
+		.height1 = MALI_POSITIVE(240),
+		.width2 = MALI_POSITIVE(400),
+		.height2 = MALI_POSITIVE(240),
+
+		.unk1 = 0x1080,
+		.unk3 = 0x100,
+
+		/* TODO: MRT */
+		.rt_count_1 = MALI_POSITIVE(1),
+		.rt_count_2 = 1,
+
+		/* TODO: WTF is this structure? */
+		.zero1 = 0x1f,
+		.zero2 = ctx->scratchpad.gpu,
+		.zero5 = ctx->misc_0.gpu,
+		.zero6 = ctx->misc_0.gpu + 512,
+		.zero7 = ctx->misc_1.gpu,
+		.zero8 = ctx->misc_1.gpu,
+	};
+
+#endif
 
     return framebuffer;
 }
@@ -110,6 +142,7 @@ trans_emit_fbd(struct panfrost_context *ctx)
 static void
 trans_new_frag_framebuffer(struct panfrost_context *ctx)
 {
+#ifdef SFBD
         struct mali_single_framebuffer fb = trans_emit_fbd(ctx);
 
         fb.framebuffer = ctx->framebuffer.gpu;
@@ -123,6 +156,9 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 	}
 
         fb.format = 0xb84e0281; /* RGB32, no MSAA */
+#else
+	struct bifrost_framebuffer fb = trans_emit_fbd(ctx);
+#endif
 
         memcpy(&ctx->fragment_fbd, &fb, sizeof(fb));
 }
@@ -736,6 +772,9 @@ trans_fragment_job(struct panfrost_context *ctx)
 	struct mali_job_descriptor_header header = {
 		.job_type = JOB_TYPE_FRAGMENT,
 		.job_index = 1,
+#ifdef BIT64
+		.job_descriptor_size = 1
+#endif
 	};
 
 	struct mali_payload_fragment payload = {
@@ -2214,6 +2253,8 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 1, 0);
 	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->misc_0, 32, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->misc_1, 1, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
 	trans_setup_framebuffer(ctx, NULL, 1366, 768);
@@ -2338,7 +2379,10 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);
-	ctx->vt_framebuffer = trans_emit_fbd(ctx);
+	
+	/* TODO: XXX */
+	//ctx->vt_framebuffer = trans_emit_fbd(ctx);
+	
 	trans_emit_vertex_payload(ctx);
 	trans_emit_tiler_payload(ctx);
 	trans_invalidate_frame(ctx);

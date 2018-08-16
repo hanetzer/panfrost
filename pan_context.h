@@ -15,6 +15,10 @@
 #ifndef __BUILDER_H__
 #define __BUILDER_H__
 
+#define BIT64
+#define T8XX
+#define MFBD
+
 #define _LARGEFILE64_SOURCE 1
 #define CACHE_LINE_SIZE 1024 /* TODO */ 
 #include <sys/mman.h>
@@ -38,7 +42,11 @@
 struct prim_convert_context;
 
 /* TODO: Handle on newer hardware */
+#ifdef MFBD
+#define PANFROST_DEFAULT_FBD (MALI_MFBD)
+#else
 #define PANFROST_DEFAULT_FBD (MALI_SFBD)
+#endif
 
 #define MAX_DRAW_CALLS 4096
 #define MAX_VARYINGS   4096
@@ -76,6 +84,8 @@ struct panfrost_context {
 	struct panfrost_memory tiler_heap;
 	struct panfrost_memory varying_mem;
 	struct panfrost_memory framebuffer;
+	struct panfrost_memory misc_0;
+	struct panfrost_memory misc_1;
 
 	/* Common framebuffer settings */
 	int width;
@@ -92,7 +102,12 @@ struct panfrost_context {
 	 * most obvious is the fragment framebuffer descriptor, which carries
 	 * e.g. clearing information */
 	
+#if PANFROST_DEFAULT_FBD == MALI_SFBD
 	struct mali_single_framebuffer fragment_fbd;
+#else
+	struct bifrost_framebuffer fragment_fbd;
+	struct bifrost_render_target fragment_rts[4];
+#endif
 
 	/* Each draw has corresponding vertex and tiler payloads */
 	struct mali_payload_vertex_tiler payload_vertex;
@@ -239,8 +254,6 @@ panfrost_context(struct pipe_context *pcontext)
 
 void
 trans_default_shader_backend(struct panfrost_context *ctx);
-
-struct mali_single_framebuffer trans_emit_fbd(struct panfrost_context *ctx);
 
 void
 trans_viewport(struct panfrost_context *ctx,
