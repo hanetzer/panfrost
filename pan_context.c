@@ -109,10 +109,10 @@ trans_emit_fbd(struct panfrost_context *ctx)
 	struct bifrost_framebuffer framebuffer = {
 		.tiler_meta = 0x100000000200,
 
-		.width1 = MALI_POSITIVE(400),
-		.height1 = MALI_POSITIVE(240),
-		.width2 = MALI_POSITIVE(400),
-		.height2 = MALI_POSITIVE(240),
+		.width1 = MALI_POSITIVE(ctx->width),
+		.height1 = MALI_POSITIVE(ctx->height),
+		.width2 = MALI_POSITIVE(ctx->width),
+		.height2 = MALI_POSITIVE(ctx->height),
 
 		.unk1 = 0x1080,
 		.unk3 = 0x100,
@@ -165,7 +165,7 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 		.afbc_metadata = 0x0,
 		.afbc_stride = 0,
 		.afbc_unk = 0x0,
-		.framebuffer = alloc_gpu_va_framebuffer,
+		.framebuffer = ctx->framebuffer.gpu,
 		.framebuffer_stride = /*268435356*/100,
 		.clear_color_1 = 0x664c331a,
 		.clear_color_2 = 0x664c331a,
@@ -193,13 +193,14 @@ panfrost_clear(
 		double depth, unsigned stencil)
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
-	printf("TODO: clear mfbd\n");
-	return;
 
 	struct mali_single_framebuffer *fbd = &ctx->fragment_fbd;
 
 	/* Remember that we've done something */
 	ctx->dirty |= PAN_DIRTY_DUMMY;
+
+	printf("TODO: clear mfbd\n");
+	return;
 
 	bool clear_color = buffers & PIPE_CLEAR_COLOR;
 	bool clear_depth = buffers & PIPE_CLEAR_DEPTH;
@@ -787,7 +788,8 @@ trans_fragment_job(struct panfrost_context *ctx)
 	mali_ptr fbd = panfrost_upload(&ctx->cmdstream, &ctx->fragment_fbd, sizeof(ctx->fragment_fbd), true);
 
 	/* Upload (single) render target */
-	panfrost_upload_sequential(&ctx->cmdstream, ctx->rts, sizeof(struct bifrost_render_target) * 1);
+	mali_ptr rt = panfrost_upload(&ctx->cmdstream, &ctx->fragment_rts[0], sizeof(struct bifrost_render_target) * 1, true);
+	printf("%llx, %llx\n", fbd, rt);
 
 	/* Generate the fragment (frame) job */
 

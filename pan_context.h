@@ -102,7 +102,7 @@ struct panfrost_context {
 	 * most obvious is the fragment framebuffer descriptor, which carries
 	 * e.g. clearing information */
 	
-#if PANFROST_DEFAULT_FBD == MALI_SFBD
+#ifdef SFBD
 	struct mali_single_framebuffer fragment_fbd;
 #else
 	struct bifrost_framebuffer fragment_fbd;

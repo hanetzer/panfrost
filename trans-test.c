@@ -161,7 +161,7 @@ int main(int argc, const char **argv)
 			(struct pipe_sampler_view **) texs);
 #endif
 
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < 100; ++i) {
 #if 0
 	const struct pipe_rasterizer_state stat = {
 		.line_width = 10.0f,
@@ -179,7 +179,7 @@ int main(int argc, const char **argv)
 		sizeof(attributes_data_1_0));
 #endif
 
-        union pipe_color_union u = { .f = { 0.1, 0.1, 0.1, 1.0 } };
+        union pipe_color_union u = { .f = { ((float) i)/100.0, 0.1, 0.1, 1.0 } };
         gallium->clear(gallium, PIPE_CLEAR_COLOR | PIPE_CLEAR_DEPTH | PIPE_CLEAR_STENCIL, &u, 0.0, 0.0);
 
 #if 0
