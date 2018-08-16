@@ -158,6 +158,22 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
         fb.format = 0xb84e0281; /* RGB32, no MSAA */
 #else
 	struct bifrost_framebuffer fb = trans_emit_fbd(ctx);
+
+	struct bifrost_render_target rt = {
+		.unk1 = 0x4000000,
+		.format = 0x880a8899, /* RGB32, no MSAA */
+		.afbc_metadata = 0x0,
+		.afbc_stride = 0,
+		.afbc_unk = 0x0,
+		.framebuffer = alloc_gpu_va_framebuffer,
+		.framebuffer_stride = /*268435356*/100,
+		.clear_color_1 = 0x664c331a,
+		.clear_color_2 = 0x664c331a,
+		.clear_color_3 = 0x664c331a,
+		.clear_color_4 = 0x664c331a,
+	};
+
+	memcpy(&ctx->fragment_rts[0], &rt, sizeof(rt));
 #endif
 
         memcpy(&ctx->fragment_fbd, &fb, sizeof(fb));
@@ -177,6 +193,9 @@ panfrost_clear(
 		double depth, unsigned stencil)
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
+	printf("TODO: clear mfbd\n");
+	return;
+
 	struct mali_single_framebuffer *fbd = &ctx->fragment_fbd;
 
 	/* Remember that we've done something */
@@ -765,7 +784,10 @@ trans_fragment_job(struct panfrost_context *ctx)
 	/* The frame is complete and therefore the framebuffer descriptor is
 	 * ready for linkage and upload */
 
-	mali_ptr fbd = panfrost_upload(&ctx->cmdstream, &ctx->fragment_fbd, sizeof(ctx->fragment_fbd), false);
+	mali_ptr fbd = panfrost_upload(&ctx->cmdstream, &ctx->fragment_fbd, sizeof(ctx->fragment_fbd), true);
+
+	/* Upload (single) render target */
+	panfrost_upload_sequential(&ctx->cmdstream, ctx->rts, sizeof(struct bifrost_render_target) * 1);
 
 	/* Generate the fragment (frame) job */
 
