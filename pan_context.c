@@ -1174,10 +1174,6 @@ panfrost_flush(
 #ifndef DRY_RUN
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
-	for(int i = 0; i < 100; ++i) {
-		printf("%X ", ctx->framebuffer.cpu[i]);
-	}
-	printf("\n");
 #endif
 #endif
 }	
