@@ -17,6 +17,8 @@
 
 #include <mali-ioctl.h>
 
+#define T8XX
+
 #define MALI_SHORT_PTR_BITS (sizeof(uintptr_t)*8)
 
 #define MALI_FBD_HIERARCHY_WEIGHTS 8
@@ -36,6 +38,7 @@ enum mali_job_type {
 };
 
 enum mali_gl_mode {
+	MALI_GL_NONE           = 0x0,
 	MALI_GL_POINTS         = 0x1,
 	MALI_GL_LINES          = 0x2,
 	MALI_GL_LINE_STRIP     = 0x4,
@@ -198,8 +201,6 @@ struct mali_blend_equation {
 	/* Corresponds to MALI_MASK_* above and glColorMask arguments */
 
 	unsigned color_mask : 4;
-
-	unsigned padding   : 32;
 } __attribute__((packed));
 
 /* Alpha coverage is encoded as 4-bits (from a clampf), with inversion
@@ -212,33 +213,60 @@ struct mali_blend_equation {
 /* Applies to unknown1 */
 #define MALI_NO_ALPHA_TO_COVERAGE (1 << 10)
 
-struct mali_tripipe {
+struct mali_blend_meta {
+#ifdef T8XX
+	u64 unk1;
+	struct mali_blend_equation blend_equation_1;
+	u32 zero1;
+	u64 zero2;
+	struct mali_blend_equation blend_equation_2;
+	u32 zero3;
+#else
+	u32 unk1; // = 0x200
+	struct mali_blend_equation blend_equation;
+	/*
+	 * - 0x19 normally
+	 * - 0x3 when this slot is unused (everything else is 0 except the index)
+	 * - 0x11 when this is the fourth slot (and it's used)
+	 */
+	u16 unk2;
+	/* increments from 0 to 3 */
+	u16 index;
+	u32 unk3; // = 0x10ed688
+#endif
+} __attribute__((packed));
+
+struct mali_shader_meta {
 	mali_ptr shader;
-
-	u16 texture_count; 
+	u16 texture_count;
 	u16 sampler_count;
-
-	/* Counted as number of address slots (i.e. half-precision vec4's) */
 	u16 attribute_count;
 	u16 varying_count;
 
-	/* 0x200 except MALI_NO_ALPHA_TO_COVERAGE. Mysterious 1 other times. Who knows really? */
-	u16 unknown1; 
+	union {
+		struct {
+			u32 uniform_buffer_count : 4;
+			u32 unk1 : 28; // = 0x800000 for vertex, 0x958020 for tiler
+		} bifrost1;
+		struct {
+			/* 0x200 except MALI_NO_ALPHA_TO_COVERAGE. Mysterious 1
+			 * other times. Who knows really? */
+			u16 unknown1; 
 
-	 /* Whole number of uniform registers used, times two; whole number of
-	  * work registers used (no scale). 
+			 /* Whole number of uniform registers used, times two;
+			  * whole number of work registers used (no scale). 
+			  */
+			unsigned work_count : 5;
+			unsigned uniform_count : 5;
+			unsigned unknown2 : 6;
+		} midgard1;
+	};
+
+	/* On bifrost: Exactly the same as glPolygonOffset() for both.
+	 * On midgard: Depth factor is exactly as passed to glPolygonOffset.
+	 * Depth units is equal to the value passed to glDeptOhffset + 1.0f
+	 * (use MALI_NEGATIVE)
 	 */
-
-	unsigned work_count : 5;
-	unsigned uniform_count : 5;
-	unsigned unknown2 : 6;
-} __attribute__((packed));
-
-struct mali_fragment_core {
-	/* Depth factor is exactly as passed to glDepthOffset. Depth units is
-	 * equal to the value passed to glDeptOhffset + 1.0f (use
-	 * MALI_NEGATIVE) */
-
 	float depth_units;
 	float depth_factor;
 
@@ -254,24 +282,75 @@ struct mali_fragment_core {
 	struct mali_stencil_test stencil_front;
 	struct mali_stencil_test stencil_back;
 
-	u32 unknown2_7;
+	union {
+		struct {
+			u32 unk3 : 7;
+			/* On Bifrost, some system values are preloaded in
+			 * registers R55-R62 by the thread dispatcher prior to
+			 * the start of shader execution. This is a bitfield
+			 * with one entry for each register saying which
+			 * registers need to be preloaded. Right now, the known
+			 * values are:
+			 *
+			 * Vertex/compute:
+			 * - R55 : gl_LocalInvocationID.xy
+			 * - R56 : gl_LocalInvocationID.z + unknown in high 16 bits
+			 * - R57 : gl_WorkGroupID.x
+			 * - R58 : gl_WorkGroupID.y
+			 * - R59 : gl_WorkGroupID.z
+			 * - R60 : gl_GlobalInvocationID.x
+			 * - R61 : gl_GlobalInvocationID.y/gl_VertexID (without base)
+			 * - R62 : gl_GlobalInvocationID.z/gl_InstanceID (without base)
+			 *
+			 * Fragment:
+			 * - R55 : unknown, never seen (but the bit for this is
+			 *   always set?)
+			 * - R56 : unknown (bit always unset)
+			 * - R57 : gl_PrimitiveID
+			 * - R58 : gl_FrontFacing in low bit, potentially other stuff
+			 * - R59 : u16 fragment coordinates (used to compute
+			 *   gl_FragCoord.xy, together with sample positions)
+			 * - R60 : gl_SampleMask (used in epilog, so pretty
+			 *   much always used, but the bit is always 0 -- is
+			 *   this just always pushed?)
+			 * - R61 : gl_SampleMaskIn and gl_SampleID, used by
+			 *   varying interpolation.
+			 * - R62 : unknown (bit always unset).
+			 */
+			u32 preload_regs : 8;
+			/* In units of 8 bytes or 64 bits, since the
+			 * uniform/const port loads 64 bits at a time.
+			 */
+			u32 uniform_count : 7;
+			u32 unk4 : 10; // = 2
+		} bifrost2;
+		struct {
+			u32 unknown2_7;
+		} midgard2;
+	};
+
+	/* zero on bifrost */
 	u32 unknown2_8;
 
-	/* Check for MALI_HAS_BLEND_SHADER to decide how to interpret */
+	/* Blending information for the older non-MRT Midgard HW. Check for
+	 * MALI_HAS_BLEND_SHADER to decide how to interpret.
+	 */
 
 	union {
 		mali_ptr blend_shader;
 
-		/* Exact format of this is not known yet */
-		struct mali_blend_equation blend_equation;
+		struct {
+			struct mali_blend_equation blend_equation;
+			u32 padding;
+		};
 	};
-} __attribute__((packed));
 
-/* See the presentations about Mali architecture for why these are together like this */
+	/* There can be up to 4 blend_meta's. None of them are required for
+	 * vertex shaders or the non-MRT case for Midgard (so the blob doesn't
+	 * allocate any space).
+	 */
+	struct mali_blend_meta blend_meta[];
 
-struct mali_shader_meta {
-	struct mali_tripipe tripipe;
-	struct mali_fragment_core fragment_core;
 } __attribute__((packed));
 
 /* This only concerns hardware jobs */
@@ -376,22 +455,71 @@ enum mali_fbd_type {
 #define FBD_TYPE (1)
 #define FBD_MASK (~0x3f)
 
-/* Applies to unknown_draw */
-#define MALI_DRAW_INDEXED_UINT8  (0x10)
-#define MALI_DRAW_INDEXED_UINT16 (0x20)
-#define MALI_DRAW_INDEXED_UINT32 (0x30)
+struct mali_uniform_buffer_meta {
+	/* This is actually the size minus 1 (MALI_POSITIVE), in units of 16
+	 * bytes. This gives a maximum of 2^14 bytes, which just so happens to
+	 * be the GL minimum-maximum for GL_MAX_UNIFORM_BLOCK_SIZE.
+	 */
+	u64 size : 10;
 
-struct mali_payload_vertex_tiler {
-	/* Exactly as passed to glLineWidth */
-	float line_width;
+	/* This is missing the bottom 2 bits and top 8 bits. The top 8 bits
+	 * should be 0 for userspace pointers, according to
+	 * https://lwn.net/Articles/718895/. By reusing these bits, we can make
+	 * each entry in the table only 64 bits.
+	 */
+	mali_ptr ptr : 64 - 10;
+};
 
-	/* Off by one */
-	u32 vertex_count; 
+/* On Bifrost, these fields are the same between the vertex and tiler payloads.
+ * They also seem to be the same between Bifrost and Midgard. They're shared in
+ * fused payloads.
+ */
 
-	u32 unk1; // 0x28000000
+struct mali_vertex_tiler_prefix {
+	/* This is a dynamic bitfield containing the following things in this order:
+	 *
+	 * - gl_WorkGroupSize.x
+	 * - gl_WorkGroupSize.y
+	 * - gl_WorkGroupSize.z
+	 * - gl_NumWorkGroups.x
+	 * - gl_NumWorkGroups.y
+	 * - gl_NumWorkGroups.z
+	 *
+	 * The number of bits allocated for each number is based on the *_shift
+	 * fields below. For example, workgroups_y_shift gives the bit that
+	 * gl_NumWorkGroups.y starts at, and workgroups_z_shift gives the bit
+	 * that gl_NumWorkGroups.z starts at (and therefore one after the bit
+	 * that gl_NumWorkGroups.y ends at). The actual value for each gl_*
+	 * value is one more than the stored value, since if any of the values
+	 * are zero, then there would be no invocations (and hence no job). If
+	 * there were 0 bits allocated to a given field, then it must be zero,
+	 * and hence the real value is one.
+	 *
+	 * Vertex jobs reuse the same job dispatch mechanism as compute jobs,
+	 * effectively doing glDispatchCompute(1, vertex_count, instance_count)
+	 * where vertex count is the number of vertices.
+	 */
+	u32 invocation_count; 
 
-	unsigned draw_mode : 4;
-	unsigned unknown_draw : 28; 
+	u32 size_y_shift : 5;
+	u32 size_z_shift : 5;
+	u32 workgroups_x_shift : 6;
+	u32 workgroups_y_shift : 6;
+	u32 workgroups_z_shift : 6;
+	/* This is max(workgroups_x_shift, 2) in all the cases I've seen. */
+	u32 workgroups_x_shift_2 : 4;
+
+	u32 draw_mode : 4;
+	u32 unknown_draw : 22; 
+
+	/* This is the the same as workgroups_x_shift_2 in compute shaders, but
+	 * always 5 for vertex jobs and 6 for tiler jobs. I suspect this has
+	 * something to do with how many quads get put in the same execution
+	 * engine, which is a balance (you don't want to starve the engine, but
+	 * you also want to distribute work evenly).
+	 */
+	u32 workgroups_x_shift_3 : 6;
+
 
 	u32 zero0;
 	u32 zero1;
@@ -408,21 +536,75 @@ struct mali_payload_vertex_tiler {
 	 * once! NULL for non-indexed draws. */
 
 	uintptr_t indices;
+} __attribute__((packed));
 
-	u32 zero3;
-	u32 gl_enables; // 0x5
+struct bifrost_vertex_only {
+	u32 unk2; /* =0x2 */
 
-	/* Offset for first vertex in buffer */
-	u32 draw_start;
+	u32 zero0;
 
-	u32 zero5;
+	u64 zero1;
+} __attribute__((packed));
 
+struct bifrost_tiler_heap_meta {
+	u32 zero;
+	u32 heap_size;
+	/* note: these are just guesses! */
+	mali_ptr tiler_heap_start;
+	mali_ptr tiler_heap_free;
+	mali_ptr tiler_heap_end;
+
+	/* hierarchy weights? but they're still 0 after the job has run... */
+	u32 zeros[12];
+} __attribute__((packed));
+
+struct bifrost_tiler_meta {
+	u64 zero0;
+	u32 unk; // = 0xf0
+	u16 width;
+	u16 height;
+	u64 zero1;
+	mali_ptr tiler_heap_meta;
+	/* TODO wtf is this used for */
+	u64 zeros[20];
+} __attribute__((packed));
+
+struct bifrost_tiler_only {
+	/* 0x20 */
+	float line_width;
+	u32 zero0;
+
+	mali_ptr tiler_meta;
+
+	u64 zero1, zero2, zero3, zero4, zero5, zero6;
+
+	u32 gl_enables;
+	u32 zero7;
+	u64 zero8;
+} __attribute__((packed));
+
+struct bifrost_scratchpad {
+	u32 zero;
+	u32 flags; // = 0x1f
+	/* This is a pointer to a CPU-inaccessible buffer, 16 pages, allocated
+	 * during startup. It seems to serve the same purpose as the
+	 * gpu_scratchpad in the SFBD for Midgard, although it's slightly
+	 * larger.
+	 */
+	mali_ptr gpu_scratchpad;
+} __attribute__((packed));
+
+struct mali_vertex_tiler_postfix {
 	/* Zero for vertex jobs. Pointer to the position (gl_Position) varying
-	 * output from the vertex shader for tiler jobs. */
+	 * output from the vertex shader for tiler jobs.
+	 */
 
 	uintptr_t position_varying;
 
-	uintptr_t unknown1; /* pointer */
+	/* An array of mali_uniform_buffer_meta's. The size is given by the
+	 * shader_meta.
+	 */
+	uintptr_t uniform_buffers;
 
 	/* For reasons I don't quite understand this is a pointer to a pointer.
 	 * That second pointer points to the actual texture descriptor. */
@@ -439,12 +621,71 @@ struct mali_payload_vertex_tiler {
 	uintptr_t attributes; /* struct attribute_buffer[] */
 	uintptr_t attribute_meta; /* attribute_meta[] */
 	uintptr_t varyings; /* struct attr */
-	uintptr_t unknown6; /* pointer */
+	uintptr_t varying_meta; /* pointer */
 	uintptr_t viewport;
-	u32 zero6;
+	uintptr_t zero6;
+
+	/* Note: on Bifrost, this isn't actually the FBD. It points to
+	 * bifrost_scratchpad instead. However, it does point to the same thing
+	 * in vertex and tiler jobs.
+	 */
 	mali_ptr framebuffer;
+
+#if UINTPTR_MAX == 0xffffffffffffffff /* 64-bit */
+#ifndef T8XX
+	/* most likely padding to make this a multiple of 64 bytes */
+	u64 zero7;
+#endif
+#endif
 } __attribute__((packed));
-//ASSERT_SIZEOF_TYPE(struct mali_payload_vertex_tiler, 256, 256);
+
+struct midgard_payload_vertex_tiler {
+#ifdef T6XX
+	float line_width;
+#endif
+
+	struct mali_vertex_tiler_prefix prefix;
+
+#ifdef T6XX
+	u32 zero3;
+#endif
+	u32 gl_enables; // 0x5
+
+	/* Offset for first vertex in buffer */
+	u32 draw_start;
+
+#ifdef T6XX
+	u32 zero5;
+#else
+	u64 zero5;
+#endif
+
+	struct mali_vertex_tiler_postfix postfix;
+
+#ifdef T8XX
+	float line_width;
+#endif
+} __attribute__((packed));
+
+struct bifrost_payload_vertex {
+	struct mali_vertex_tiler_prefix prefix;
+	struct bifrost_vertex_only vertex;
+	struct mali_vertex_tiler_postfix postfix;
+} __attribute__((packed));
+
+struct bifrost_payload_tiler {
+	struct mali_vertex_tiler_prefix prefix;
+	struct bifrost_tiler_only tiler;
+	struct mali_vertex_tiler_postfix postfix;
+} __attribute__((packed));
+
+struct bifrost_payload_fused {
+	struct mali_vertex_tiler_prefix prefix;
+	struct bifrost_tiler_only tiler;
+	struct mali_vertex_tiler_postfix tiler_postfix;
+	struct bifrost_vertex_only vertex;
+	struct mali_vertex_tiler_postfix vertex_postfix;
+} __attribute__((packed));
 
 /* Pointed to from texture_trampoline, mostly unknown still, haven't
  * managed to replay successfully */
@@ -782,23 +1023,54 @@ struct mali_single_framebuffer {
 	/* More below this, maybe */
 } __attribute__((packed));
 
+/* Multi? Framebuffer Descriptor */
+
+struct mali_tentative_mfbd {
+	u64 blah; /* XXX: what the fuck is this? */
+	/* This GPU address is unknown, except for the fact there's something
+	 * executable here... */
+	u64 ugaT;
+	u32 block1[10];
+	u32 unknown1;
+	u32 flags;
+	u8 block2[16];
+	u64 heap_free_address;
+	u64 unknown2;
+	u32 weights[MALI_FBD_HIERARCHY_WEIGHTS];
+	u64 unknown_gpu_addressN;
+	u8 block3[88];
+	u64 unknown_gpu_address;
+	u64 unknown3;
+	u8 block4[40];
+} __attribute__((packed));
+
 struct bifrost_render_target {
 	u32 unk1; // = 0x4000000
 	u32 format;
 
 	u64 zero1;
 
-	/* Stuff related to ARM Framebuffer Compression. When AFBC is enabled,
-	 * there is an extra metadata buffer that contains 16 bytes per tile.
-	 * The framebuffer needs to be the same size as before, since we don't
-	 * know ahead of time how much space it will take up. The
-	 * framebuffer_stride is set to 0, since the data isn't stored linearly
-	 * anymore.
-	 */
+	union {
+		struct {
+			/* Stuff related to ARM Framebuffer Compression. When AFBC is enabled,
+			 * there is an extra metadata buffer that contains 16 bytes per tile.
+			 * The framebuffer needs to be the same size as before, since we don't
+			 * know ahead of time how much space it will take up. The
+			 * framebuffer_stride is set to 0, since the data isn't stored linearly
+			 * anymore.
+			 */
 
-	mali_ptr afbc_metadata;
-	u32 afbc_stride; // stride in units of tiles
-	u32 afbc_unk; // = 0x20000
+			mali_ptr metadata;
+			u32 stride; // stride in units of tiles
+			u32 unk; // = 0x20000
+		} afbc;
+
+		struct {
+			/* Heck if I know */
+			u64 unk;
+			mali_ptr pointer;
+		} chunknown;
+	};
 
 	mali_ptr framebuffer;
 
