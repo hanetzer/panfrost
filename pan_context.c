@@ -1038,6 +1038,17 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		}
 	}
 
+	mali_ptr ubuf = panfrost_reserve(&ctx->cmdstream, 4 * 4 * 2);
+	struct mali_uniform_buffer_meta uniform_buffers[] = {
+		{
+			.size = MALI_POSITIVE(2),
+			.ptr = ubuf >> 2,
+		},
+	};
+
+	mali_ptr ubufs = panfrost_upload(&ctx->cmdstream, uniform_buffers, sizeof(uniform_buffers), false);
+	ctx->payload_vertex.postfix.uniform_buffers = ubufs;
+
 	ctx->dirty = 0;
 }
 
