@@ -1010,7 +1010,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		struct panfrost_constant_buffer *buf = &ctx->constant_buffer[i];
 
 		if (buf->dirty) {
-			mali_ptr address = panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, false);
+			mali_ptr address = buf->size ? panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, false) : 0;
 			
 			switch (i) {
 				case PIPE_SHADER_VERTEX:

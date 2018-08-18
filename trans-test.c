@@ -66,6 +66,7 @@ int main(int argc, const char **argv)
 
 	gallium->set_vertex_buffers(gallium, 0, 2, buffs);
 
+#if 0
         float uniforms[] = {
 		0.8, 0.0, 0.4, 1.0,
 		0.2, 0.9, 0.6, 1.0,
@@ -84,6 +85,7 @@ int main(int argc, const char **argv)
 	};
 	
 	//gallium->set_constant_buffer(gallium, PIPE_SHADER_VERTEX, 0, &consts);
+#endif
 
 	/*
 	uint32_t indices[] = {
