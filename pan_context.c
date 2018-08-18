@@ -916,7 +916,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		ctx->payload_tiler.line_width = ctx->rasterizer->base.line_width;
 		ctx->payload_tiler.gl_enables = ctx->rasterizer->tiler_gl_enables;
 
-		trans_set_framebuffer_msaa(ctx, FORCE_MSAA || ctx->rasterizer->base.multisample);
+		//trans_set_framebuffer_msaa(ctx, FORCE_MSAA || ctx->rasterizer->base.multisample);
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VS) {
