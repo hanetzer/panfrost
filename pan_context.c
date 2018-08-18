@@ -680,7 +680,7 @@ trans_make_stencil_state(const struct pipe_stencil_state *in, struct mali_stenci
 void
 trans_default_shader_backend(struct panfrost_context *ctx)
 {
-	struct mali_fragment_core shader = {
+	struct mali_shader_meta shader = {
 		.alpha_coverage = ~MALI_ALPHA_COVERAGE(0.000000),
 		.unknown2_3 = MALI_DEPTH_FUNC(MALI_FUNC_ALWAYS) | 0x3010 | MALI_CAN_DISCARD,
 		.unknown2_4 = MALI_NO_MSAA | 0x4f0,
@@ -871,8 +871,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_VS) {
 		assert(ctx->vs);
-		ctx->payload_vertex.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->vs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
-		panfrost_reserve(&ctx->cmdstream_persistent, sizeof(struct mali_fragment_core));
+		ctx->payload_vertex.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->vs->tripipe, sizeof(struct mali_shader_meta), true) >> 4;
 
 		/* Varying descriptor is tied to the vertex shader. Also the
 		 * fragment shader, I suppose, but it's generated with the
@@ -883,8 +882,9 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_FS) { 
 		assert(ctx->fs);
-		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
-		panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
+		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_shader_meta), true) >> 4;
+		/* XXX: MERGE IN FRAGMENT SHADER CORE PROPERTIES? */
+		//panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VERTEX) {

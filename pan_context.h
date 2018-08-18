@@ -117,7 +117,7 @@ struct panfrost_context {
 	 * also everything else in the shader core, including blending, the
 	 * stencil/depth tests, etc. Refer to the presentations. */
 
-	struct mali_fragment_core fragment_shader_core;
+	struct mali_shader_meta fragment_shader_core;
 
 	/* A frame is composed of a starting set value job, a number of vertex
 	 * and tiler jobs, linked to the fragment job at the end. See the
@@ -194,7 +194,7 @@ struct panfrost_shader_state {
 
 	/* Compiled descriptor, ready for the hardware */
 	bool compiled;
-	struct mali_tripipe tripipe;
+	struct mali_shader_meta tripipe;
 };
 
 struct panfrost_vertex_state {
