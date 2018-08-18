@@ -928,9 +928,23 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_FS) { 
 		assert(ctx->fs);
-		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_shader_meta), true) >> 4;
+#define COPY(name) ctx->fragment_shader_core.name = ctx->fs->tripipe.name
+
+		COPY(shader);
+		COPY(texture_count);
+		COPY(sampler_count);
+		COPY(attribute_count);
+		COPY(varying_count);
+		COPY(midgard1.uniform_count);
+		COPY(midgard1.work_count);
+		COPY(midgard1.unknown1);
+		COPY(midgard1.unknown2);
+
+#undef COPY
+
 		/* XXX: MERGE IN FRAGMENT SHADER CORE PROPERTIES? */
 		//panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
+		ctx->payload_vertex.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_shader_meta), true) >> 4;
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VERTEX) {
