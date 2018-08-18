@@ -103,7 +103,7 @@ trans_emit_fbd(struct panfrost_context *ctx)
     trans_set_framebuffer_resolution(&framebuffer, ctx->width, ctx->height);
 #else
 	struct bifrost_framebuffer framebuffer = {
-		.tiler_meta = 0x100000000200,
+		.tiler_meta = 0xf000000c00,
 
 		.width1 = MALI_POSITIVE(ctx->width),
 		.height1 = MALI_POSITIVE(ctx->height),
@@ -384,7 +384,7 @@ trans_emit_vertex_payload(struct panfrost_context *ctx)
 			.workgroups_x_shift_2 = 0x2,
 			.workgroups_x_shift_3 = 0x5,
 		},
-		.gl_enables = 0x4
+		.gl_enables = 0x6
 	};
 
 	memcpy(&ctx->payload_vertex, &payload, sizeof(payload));

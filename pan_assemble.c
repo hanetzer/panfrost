@@ -145,6 +145,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	    meta->varying_count = 4;
 	    meta->midgard1.uniform_count = 12;
 	    meta->midgard1.unknown1 = 1; /* XXX: WTF is this?! */
+	    meta->midgard1.unknown2 = 8; /* XXX: WTF is this?! */
     } else {
 	    meta->attribute_count = 0;
 	    meta->varying_count = 2;
