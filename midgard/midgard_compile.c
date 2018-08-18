@@ -393,10 +393,10 @@ static void
 alias_ssa(compiler_context *ctx, int dest, int src, bool literal_dest)
 {
 	if (literal_dest) {
-		_mesa_hash_table_u64_insert(ctx->register_to_ssa, src, (void *) ((uintptr_t) dest + 1));
+		_mesa_hash_table_u64_insert(ctx->register_to_ssa, src + 1, (void *) ((uintptr_t) dest + 1));
 	} else {
-		_mesa_hash_table_u64_insert(ctx->ssa_to_alias, dest, (void *) ((uintptr_t) src + 1));
-		_mesa_set_add(ctx->leftover_ssa_to_alias, (void *) (uintptr_t) dest);
+		_mesa_hash_table_u64_insert(ctx->ssa_to_alias, dest + 1, (void *) ((uintptr_t) src + 1));
+		_mesa_set_add(ctx->leftover_ssa_to_alias, (void *) (uintptr_t) (dest + 1));
 	}
 }
 
@@ -1726,12 +1726,12 @@ embedded_to_inline_constant(compiler_context *ctx)
 static void
 map_ssa_to_alias(compiler_context *ctx, int *ref)
 {
-	uintptr_t alias = _mesa_hash_table_u64_search(ctx->ssa_to_alias, *ref);
+	uintptr_t alias = _mesa_hash_table_u64_search(ctx->ssa_to_alias, *ref + 1);
 	
 	if (alias) {
 		/* Remove entry in leftovers to avoid a redunant fmov */
 
-		struct set_entry *leftover = _mesa_set_search(ctx->leftover_ssa_to_alias, (void *) (uintptr_t) *ref);
+		struct set_entry *leftover = _mesa_set_search(ctx->leftover_ssa_to_alias, ((void *) (uintptr_t) (*ref + 1)));
 
 		if (leftover)
 			_mesa_set_remove(ctx->leftover_ssa_to_alias, leftover);
@@ -1741,7 +1741,7 @@ map_ssa_to_alias(compiler_context *ctx, int *ref)
 		return;
 	}
 
-	alias = _mesa_hash_table_u64_search(ctx->register_to_ssa, *ref);
+	alias = _mesa_hash_table_u64_search(ctx->register_to_ssa, (*ref) + 1);
 
 	if (alias) {
 		*ref = alias - 1;
@@ -1758,7 +1758,7 @@ emit_leftover_move(compiler_context *ctx)
 	struct set_entry *leftover;
 
 	set_foreach(ctx->leftover_ssa_to_alias, leftover) {
-		int base = (uintptr_t) leftover->key;
+		int base = ((uintptr_t) leftover->key) - 1;
 		int mapped = base;
 
 		map_ssa_to_alias(ctx, &mapped);
@@ -1785,7 +1785,7 @@ static void
 actualise_register_to_ssa(compiler_context *ctx)
 {
 	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
-		uintptr_t reg = (uintptr_t) _mesa_hash_table_u64_search(ctx->register_to_ssa, ins->ssa_args.dest);
+		uintptr_t reg = (uintptr_t) _mesa_hash_table_u64_search(ctx->register_to_ssa, ins->ssa_args.dest + 1);
 
 		if (reg) {
 			ins->ssa_args.dest = reg - 1;
