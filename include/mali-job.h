@@ -475,6 +475,11 @@ struct mali_uniform_buffer_meta {
  * fused payloads.
  */
 
+/* Applies to unknown_draw */
+#define MALI_DRAW_INDEXED_UINT8  (0x10)
+#define MALI_DRAW_INDEXED_UINT16 (0x20)
+#define MALI_DRAW_INDEXED_UINT32 (0x30)
+
 struct mali_vertex_tiler_prefix {
 	/* This is a dynamic bitfield containing the following things in this order:
 	 *
