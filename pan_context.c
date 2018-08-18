@@ -44,7 +44,7 @@
 
 /* MSAA is not supported in sw_winsys but it does make for nicer demos ;) so we
  * can force it regardless of gallium saying we don't have it */
-static bool FORCE_MSAA = true;
+static bool FORCE_MSAA = false;
 
 /* Descriptor is generated along with the shader compiler */
 
@@ -713,8 +713,12 @@ trans_default_shader_backend(struct panfrost_context *ctx)
 {
 	struct mali_shader_meta shader = {
 		.alpha_coverage = ~MALI_ALPHA_COVERAGE(0.000000),
-		.unknown2_3 = MALI_DEPTH_FUNC(MALI_FUNC_ALWAYS) | 0x3010 | MALI_CAN_DISCARD,
+		.unknown2_3 = MALI_DEPTH_FUNC(MALI_FUNC_ALWAYS) | 0x3010 /*| MALI_CAN_DISCARD*/,
+#ifdef T8XX
+		.unknown2_4 = MALI_NO_MSAA | 0x4e0,
+#else
 		.unknown2_4 = MALI_NO_MSAA | 0x4f0,
+#endif
 	};
 
 	struct pipe_stencil_state default_stencil = {
@@ -2379,12 +2383,12 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->cmdstream, 8*64*2, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->cmdstream_persistent, 8*64*4, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->textures, 4*64*64, true, true, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->scratchpad, 16, true, true, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->scratchpad, 32, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 0, 0);
-	trans_allocate_slab(ctx, &ctx->tiler_heap, 16384, false, false, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->misc_0, 32, false, false, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->misc_1, 1, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->tiler_heap, 65536, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->misc_0, 64, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->misc_1, 32, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
 	trans_setup_framebuffer(ctx, NULL, 1366, 768);

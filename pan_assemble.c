@@ -145,17 +145,17 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	    meta->varying_count = 4;
 	    meta->midgard1.uniform_count = 12;
 	    meta->midgard1.unknown1 = 1; /* XXX: WTF is this?! */
-	    meta->midgard1.unknown2 = 8; /* XXX: WTF is this?! */
     } else {
 	    meta->attribute_count = 0;
-	    meta->varying_count = 2;
-	    meta->texture_count = 3;
-	    meta->sampler_count = 3;
-	    meta->midgard1.uniform_count = 1;
+	    meta->varying_count = 1;
+	    meta->texture_count = 0;
+	    meta->sampler_count = 0;
+	    meta->midgard1.uniform_count = 0;
 	    meta->midgard1.unknown1 = MALI_NO_ALPHA_TO_COVERAGE | 0x200; /* XXX: WTF is this?! */
     }
 
     meta->midgard1.work_count = 8;
+    meta->midgard1.unknown2 = 8; /* XXX: WTF is this?! */
 
     /* Varyings are known only through the shader. We choose to upload this
      * information with the vertex shader, though the choice is perhaps
