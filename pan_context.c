@@ -1086,12 +1086,14 @@ trans_link_jobs(struct panfrost_context *ctx)
 	}
 
 	/* V -> V/T ; T -> T/null */
+#if 0
 	for (int i = 0; i < ctx->draw_count; ++i) {
 		bool isLast = (i + 1) == ctx->draw_count;
 
 		trans_link_job_pair(ctx->cmdstream, ctx->vertex_jobs[i], isLast ? ctx->tiler_jobs[0] : ctx->vertex_jobs[i + 1]);
 		trans_link_job_pair(ctx->cmdstream, ctx->tiler_jobs[i], isLast ? 0 : ctx->tiler_jobs[i + 1]);
 	}
+#endif
 }
 
 /* Use to allocate atom numbers for jobs. We probably want to overhaul this in kernel space at some point. */
@@ -1174,6 +1176,8 @@ trans_submit_frame(struct panfrost_context *ctx)
 		    printf("Error submitting\n");
 	}
 
+#if 0
+
 	/* Submit jobs seperately to workaround the missing tile issue? XXX
 	 * FIXME when we redesign the kernel interface */
 
@@ -1185,6 +1189,7 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 	if (pandev_ioctl(ctx->fd, MALI_IOCTL_JOB_SUBMIT, &submit2))
 	    printf("Error submitting\n");
+#endif
 
 	last_fragment_id = atoms[1].atom_number;
 #endif
