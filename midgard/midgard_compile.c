@@ -409,7 +409,7 @@ emit_load_const(compiler_context *ctx, nir_load_const_instr *instr)
 
 	float *v = ralloc_array(NULL, float, 4);
 	memcpy(v, &instr->value.f32, 4 * sizeof(float));
-	_mesa_hash_table_u64_insert(ctx->ssa_constants, def.index, v);
+	_mesa_hash_table_u64_insert(ctx->ssa_constants, def.index + 1, v);
 }
 
 static unsigned
@@ -1491,7 +1491,7 @@ skip_instruction:
  * pressure and saves space. */
 
 #define CONDITIONAL_ATTACH(src) { \
-	void *entry = _mesa_hash_table_u64_search(ctx->ssa_constants, alu->ssa_args.src); \
+	void *entry = _mesa_hash_table_u64_search(ctx->ssa_constants, alu->ssa_args.src + 1); \
 \
 	if (entry) { \
 		attach_constants(alu, entry); \
