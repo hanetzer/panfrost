@@ -51,6 +51,9 @@ pandev_upload(int cheating_offset, int *stack_bottom, mali_ptr base, void *base_
 {
 	int offset;
 
+	/* This is probably wrong */
+	no_pad = true;
+
 	/* We're not positive about the sizes of all objects, but we don't want
 	 * them to crash against each other either. Let the caller disable
 	 * padding if they so choose, though. */

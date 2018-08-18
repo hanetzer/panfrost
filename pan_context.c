@@ -84,11 +84,7 @@ trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int 
 	fb->resolution_check = ((w + h) / 3) << 4;
 }
 
-#ifdef SFBD
-static struct mali_single_framebuffer
-#else
-static struct bifrost_framebuffer
-#endif
+static PANFROST_FRAMEBUFFER
 trans_emit_fbd(struct panfrost_context *ctx)
 {
 #ifdef SFBD
@@ -262,7 +258,8 @@ panfrost_clear(
 static void
 trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 {
-	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(struct mali_single_framebuffer), false);
+	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(ctx->vt_framebuffer), false) | PANFROST_DEFAULT_FBD;
+	printf("Setting %llx\n", framebuffer_1_p);
 	ctx->payload_vertex.postfix.framebuffer = framebuffer_1_p;
 	ctx->payload_tiler.postfix.framebuffer = framebuffer_1_p;
 }
@@ -286,6 +283,7 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* Regenerate payloads */
 	trans_attach_vt_framebuffer(ctx);
+	printf("%p\n", ctx->payload_vertex.postfix.framebuffer);
 
 	if (ctx->rasterizer)
 		ctx->dirty |= PAN_DIRTY_RASTERIZER;
@@ -733,6 +731,9 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 	struct mali_job_descriptor_header job = {
 		.job_type = is_tiler ? JOB_TYPE_TILER : JOB_TYPE_VERTEX,
 		.job_index = draw_job_index + (is_tiler ? 1 : 0),
+#ifdef BIT64
+		.job_descriptor_size = 1,
+#endif 
 	};
 
 	/* XXX: What is this? */
@@ -751,9 +752,18 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 		if (ctx->draw_count)
 			job.job_dependency_index_2 = draw_job_index - 1;
 	}
+	printf("ffb %p\n", ctx->payload_vertex.postfix.framebuffer);
 	struct midgard_payload_vertex_tiler *payload = is_tiler ? &ctx->payload_tiler : &ctx->payload_vertex;
 
-	mali_ptr job_p = panfrost_upload(&ctx->cmdstream, &job, sizeof(job) - 4, true);
+	/* There's some padding hacks on 32-bit */
+
+#ifdef BIT64
+	int offset = 0;
+#else
+	int offset = 4;
+#endif
+
+	mali_ptr job_p = panfrost_upload(&ctx->cmdstream, &job, sizeof(job) - offset, true);
 	panfrost_upload_sequential(&ctx->cmdstream, payload, sizeof(*payload));
 
 	return job_p;
@@ -2413,7 +2423,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	trans_setup_hardware(ctx);
 	
 	/* TODO: XXX */
-	//ctx->vt_framebuffer = trans_emit_fbd(ctx);
+	ctx->vt_framebuffer = trans_emit_fbd(ctx);
 	
 	trans_emit_vertex_payload(ctx);
 	trans_emit_tiler_payload(ctx);

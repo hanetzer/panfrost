@@ -44,8 +44,10 @@ struct prim_convert_context;
 /* TODO: Handle on newer hardware */
 #ifdef MFBD
 #define PANFROST_DEFAULT_FBD (MALI_MFBD)
+#define PANFROST_FRAMEBUFFER struct bifrost_framebuffer
 #else
 #define PANFROST_DEFAULT_FBD (MALI_SFBD)
+#define PANFROST_FRAMEBUFFER struct mali_single_framebuffer
 #endif
 
 #define MAX_DRAW_CALLS 4096
@@ -145,7 +147,7 @@ struct panfrost_context {
 	struct mali_unknown6 varyings_descriptor_1;
 
 	struct mali_viewport viewport;
-	struct mali_single_framebuffer vt_framebuffer;
+	PANFROST_FRAMEBUFFER vt_framebuffer;
 
 	/* TODO: Multiple uniform buffers (index =/= 0), finer updates? */
 
