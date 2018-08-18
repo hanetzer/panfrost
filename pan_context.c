@@ -162,9 +162,6 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 	struct bifrost_render_target rt = {
 		.unk1 = 0x4000000,
 		.format = 0x880a8899, /* RGB32, no MSAA */
-		.afbc_metadata = 0x0,
-		.afbc_stride = 0,
-		.afbc_unk = 0x0,
 		.framebuffer = ctx->framebuffer.gpu,
 		.framebuffer_stride = ctx->width / 4,
 	};
