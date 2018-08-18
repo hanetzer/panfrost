@@ -355,8 +355,11 @@ static void
 trans_emit_vertex_payload(struct panfrost_context *ctx)
 {
 	struct midgard_payload_vertex_tiler payload = {
-		.unk1 = 0x28000000,
-		.unknown_draw = 0x1400000,
+		.prefix = {
+			.workgroups_z_shift = 32,
+			.workgroups_x_shift_2 = 0x2,
+			.workgroups_x_shift_3 = 0x5,
+		},
 		.gl_enables = 0x4
 	};
 
@@ -440,8 +443,12 @@ static void
 trans_emit_tiler_payload(struct panfrost_context *ctx)
 {
 	struct midgard_payload_vertex_tiler payload_1 = {
-		.unk1 = 0x28000000,
-		.unknown_draw = 0x1803800
+		.prefix = {
+			.workgroups_z_shift = 32,
+			.workgroups_x_shift_2 = 0x2,
+			.workgroups_x_shift_3 = 0x5,
+			/* XXX: TODO */
+		},
 	};
 
 	memcpy(&ctx->payload_tiler, &payload_1, sizeof(payload_1));
