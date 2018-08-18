@@ -121,8 +121,8 @@ trans_emit_fbd(struct panfrost_context *ctx)
 		.zero2 = ctx->scratchpad.gpu,
 		.zero5 = ctx->misc_0.gpu,
 		.zero6 = ctx->misc_0.gpu + 512,
-		.zero7 = ctx->misc_1.gpu,
-		.zero8 = ctx->misc_1.gpu,
+		.zero7 = ctx->tiler_heap.gpu,
+		.zero8 = ctx->tiler_heap.gpu + 4096*32768,
 	};
 
 #endif
@@ -1231,7 +1231,6 @@ trans_submit_frame(struct panfrost_context *ctx)
 		    printf("Error submitting\n");
 	}
 
-#if 0
 
 	/* Submit jobs seperately to workaround the missing tile issue? XXX
 	 * FIXME when we redesign the kernel interface */
@@ -1244,7 +1243,6 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 	if (pandev_ioctl(ctx->fd, MALI_IOCTL_JOB_SUBMIT, &submit2))
 	    printf("Error submitting\n");
-#endif
 
 	last_fragment_id = atoms[1].atom_number;
 #endif
@@ -2390,9 +2388,8 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->scratchpad, 32, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 0, 0);
-	trans_allocate_slab(ctx, &ctx->tiler_heap, 65536, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->misc_0, 64, false, false, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->misc_1, 32, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
 	trans_setup_framebuffer(ctx, NULL, 1920, 1080);
