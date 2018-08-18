@@ -85,9 +85,9 @@ trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int 
 }
 
 #ifdef SFBD
-struct mali_single_framebuffer
+static struct mali_single_framebuffer
 #else
-struct bifrost_framebuffer
+static struct bifrost_framebuffer
 #endif
 trans_emit_fbd(struct panfrost_context *ctx)
 {
