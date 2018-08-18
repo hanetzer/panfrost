@@ -15,7 +15,6 @@ int main(int argc, const char **argv)
 	struct pipe_screen *screen = &_screen;
 	struct pipe_context *gallium = panfrost_create_context(screen, NULL, 0);
 
-#if 0
 	struct pipe_shader_state vs_cso, fs_cso;
 
 	gallium->bind_fs_state(gallium, gallium->create_fs_state(gallium, &fs_cso));
@@ -86,6 +85,7 @@ int main(int argc, const char **argv)
 	
 	//gallium->set_constant_buffer(gallium, PIPE_SHADER_VERTEX, 0, &consts);
 
+	/*
 	uint32_t indices[] = {
 		0, 1, 2,
 		1, 0, 3,
@@ -96,6 +96,7 @@ int main(int argc, const char **argv)
 	struct pipe_transfer *transfer3;
 	struct pipe_resource *ibuf = screen->resource_create(screen, &templ);
 	memcpy(gallium->transfer_map(gallium, ibuf, 0, 0, &box, &transfer3), indices, sizeof(indices));
+	*/
 
 
 	memcpy(attrib_trans,
@@ -110,6 +111,8 @@ int main(int argc, const char **argv)
 
 	gallium->bind_rasterizer_state(gallium,
 			gallium->create_rasterizer_state(gallium, &state));
+
+#if 0
 
 	struct pipe_sampler_state sampler_state = {
 		.wrap_s = PIPE_TEX_WRAP_REPEAT,
@@ -171,28 +174,26 @@ int main(int argc, const char **argv)
 
 	gallium->bind_rasterizer_state(gallium,
 			gallium->create_rasterizer_state(gallium, &stat));
+#endif
 
 	attributes_data_1_0[0] = sin(((float) i ) * 0.03f);
 
 	memcpy(attrib_trans,
 		attributes_data_1_0,
 		sizeof(attributes_data_1_0));
-#endif
 
         union pipe_color_union u = { .f = { ((float) i)/100.0, 0.0, 0.1, 1.0 } };
         gallium->clear(gallium, PIPE_CLEAR_COLOR | PIPE_CLEAR_DEPTH | PIPE_CLEAR_STENCIL, &u, 0.0, 0.0);
 
-#if 0
 	struct pipe_draw_info info = {
 		.start = 0,
-		.count = 9,
-		.index_size = 4,
-		.index = { .resource = ibuf },
+		.count = 3,
+		//.index_size = 4,
+		//.index = { .resource = ibuf },
 		.mode = PIPE_PRIM_TRIANGLE_STRIP
 	};
 
 	gallium->draw_vbo(gallium, &info);
-#endif
 
 	/*
 	attributes_data_1_0[0] = 0;
