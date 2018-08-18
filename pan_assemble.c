@@ -190,7 +190,9 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 		    .nr_components = MALI_POSITIVE(4),
 		    .not_normalised = 1,
 		    .unknown1 = 0x1a22,
+#ifdef T6XX
 		    .unknown2 = 1,
+#endif
 	    };
 
 
