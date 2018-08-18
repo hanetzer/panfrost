@@ -283,9 +283,7 @@ trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 	};
 
 	panfrost_upload_sequential(&ctx->cmdstream, rts_list, sizeof(rts_list));
-	printf("Sequential\n");
 #endif
-	printf("Setting %llx\n", framebuffer_1_p);
 	ctx->payload_vertex.postfix.framebuffer = framebuffer_1_p;
 	ctx->payload_tiler.postfix.framebuffer = framebuffer_1_p;
 }
@@ -309,7 +307,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* Regenerate payloads */
 	trans_attach_vt_framebuffer(ctx);
-	printf("%p\n", ctx->payload_vertex.postfix.framebuffer);
 
 	if (ctx->rasterizer)
 		ctx->dirty |= PAN_DIRTY_RASTERIZER;
@@ -786,7 +783,6 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 		if (ctx->draw_count)
 			job.job_dependency_index_2 = draw_job_index - 1;
 	}
-	printf("ffb %p\n", ctx->payload_vertex.postfix.framebuffer);
 	struct midgard_payload_vertex_tiler *payload = is_tiler ? &ctx->payload_tiler : &ctx->payload_vertex;
 
 	/* There's some padding hacks on 32-bit */
@@ -796,11 +792,9 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 #else
 	int offset = 4;
 #endif
-	printf("SZ %d, %d\n", sizeof(job), sizeof(*payload));
 
 	mali_ptr job_p = panfrost_upload(&ctx->cmdstream, &job, sizeof(job) - offset, true);
 	panfrost_upload_sequential(&ctx->cmdstream, payload, sizeof(*payload));
-	printf("Job (%d) at %llx\n", is_tiler, job_p);
 	return job_p;
 }
 
@@ -1921,7 +1915,6 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
 	 
 	 struct panfrost_screen* scr = (struct panfrost_screen *) pctx->screen;
 	 struct pipe_surface *surf = ctx->pipe_framebuffer.cbufs[i];
-	 printf("Set framebuffer\n");
       }
    }
 
@@ -2313,7 +2306,6 @@ trans_allocate_slab(struct panfrost_context *ctx,
 		mem->cpu = mmap(NULL, mem->size, 3, 1, ctx->fd, mem->gpu);
 
 	mem->stack_bottom = 0;
-	printf("%p, %llx\n", mem->cpu, mem->gpu);
 }
 
 /* Setups a framebuffer, either by itself (with the independent slow-fb
@@ -2366,12 +2358,8 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	/* TODO: Reenable imports when we understand the new kernel API */
 
 	trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
-	printf("%llx\n", ctx->framebuffer.gpu);
-	printf("rw: %d\n", rw);
 	struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
 	ctx->stride = info.stride;
-	printf("stride: %d\n", info.stride);
-	printf("size: %d = %d x %d x %d\n", ctx->framebuffer.size, ctx->bytes_per_pixel, rw, ctx->height);
 
 	//ctx->framebuffer.gpu = framebuffer_import.gpu_va;
 	//ctx->framebuffer.size = ctx->stride * ctx->height;

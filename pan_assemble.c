@@ -128,8 +128,6 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	}
 #endif
 
-	printf("Size: %d\n", last_shader_size);
-	printf("Dst: %p\n", dst);
 	meta->shader = panfrost_upload(&ctx->shaders, dst, last_shader_size, true) | 5;
 
 #ifdef HAVE_DRI3
