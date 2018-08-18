@@ -59,10 +59,11 @@ mali_ptr panfrost_upload_sequential(struct panfrost_memory *mem, const void *dat
 void *
 panfrost_allocate_transfer(struct panfrost_memory *mem, size_t sz, mali_ptr *gpu);
 
-static inline void
+static inline mali_ptr
 panfrost_reserve(struct panfrost_memory *mem, size_t sz)
 {
 	mem->stack_bottom += sz;
+	return mem->gpu + (mem->stack_bottom - sz);
 }
 
 #include <math.h>

@@ -258,7 +258,30 @@ panfrost_clear(
 static void
 trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 {
+#ifdef MFBD
+	mali_ptr who_knows = panfrost_reserve(&ctx->cmdstream, 1024);
+#endif
+
 	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(ctx->vt_framebuffer), false) | PANFROST_DEFAULT_FBD;
+
+#ifdef MFBD
+	/* MFBD needs a sequential semi-render target upload */
+
+	/* WTF any of this is, is beyond me for now */
+	struct bifrost_render_target rts_list[] = {
+		{
+			.chunknown = {
+				.unk = 0x30005,
+				.pointer = who_knows,
+			},
+			.framebuffer = ctx->scratchpad.gpu + 0x6000,
+			.zero2 = 0x3,
+		},
+	};
+
+	panfrost_upload_sequential(&ctx->cmdstream, rts_list, sizeof(rts_list));
+	printf("Sequential\n");
+#endif
 	printf("Setting %llx\n", framebuffer_1_p);
 	ctx->payload_vertex.postfix.framebuffer = framebuffer_1_p;
 	ctx->payload_tiler.postfix.framebuffer = framebuffer_1_p;
