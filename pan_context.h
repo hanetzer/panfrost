@@ -110,8 +110,8 @@ struct panfrost_context {
 #endif
 
 	/* Each draw has corresponding vertex and tiler payloads */
-	struct mali_payload_vertex_tiler payload_vertex;
-	struct mali_payload_vertex_tiler payload_tiler;
+	struct midgard_payload_vertex_tiler payload_vertex;
+	struct midgard_payload_vertex_tiler payload_tiler;
 
 	/* The fragment shader binary itself is pointed here (for the tripipe) but
 	 * also everything else in the shader core, including blending, the
@@ -262,7 +262,7 @@ trans_viewport(struct panfrost_context *ctx,
 		int viewport_x1, int viewport_y1);
 
 void
-trans_rasterizer_state(struct mali_payload_vertex_tiler *vt,
+trans_rasterizer_state(struct midgard_payload_vertex_tiler *vt,
 		float line_width,
 		int front_face);
 

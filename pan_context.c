@@ -357,7 +357,7 @@ trans_attr(size_t type_sz, int columns, int vertices)
 static void
 trans_emit_vertex_payload(struct panfrost_context *ctx)
 {
-	struct mali_payload_vertex_tiler payload = {
+	struct midgard_payload_vertex_tiler payload = {
 		.unk1 = 0x28000000,
 		.unknown_draw = 0x1400000,
 		.gl_enables = 0x4
@@ -442,7 +442,7 @@ trans_translate_alt_compare_func(enum pipe_compare_func in)
 static void
 trans_emit_tiler_payload(struct panfrost_context *ctx)
 {
-	struct mali_payload_vertex_tiler payload_1 = {
+	struct midgard_payload_vertex_tiler payload_1 = {
 		.unk1 = 0x28000000,
 		.unknown_draw = 0x1803800
 	};
@@ -747,7 +747,7 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 		if (ctx->draw_count)
 			job.job_dependency_index_2 = draw_job_index - 1;
 	}
-	struct mali_payload_vertex_tiler *payload = is_tiler ? &ctx->payload_tiler : &ctx->payload_vertex;
+	struct midgard_payload_vertex_tiler *payload = is_tiler ? &ctx->payload_tiler : &ctx->payload_vertex;
 
 	mali_ptr job_p = panfrost_upload(&ctx->cmdstream, &job, sizeof(job) - 4, true);
 	panfrost_upload_sequential(&ctx->cmdstream, payload, sizeof(*payload));
