@@ -266,8 +266,8 @@ static void
 trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 {
 	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(struct mali_single_framebuffer), false);
-	ctx->payload_vertex.framebuffer = framebuffer_1_p;
-	ctx->payload_tiler.framebuffer = framebuffer_1_p;
+	ctx->payload_vertex.postfix.framebuffer = framebuffer_1_p;
+	ctx->payload_tiler.postfix.framebuffer = framebuffer_1_p;
 }
 
 /* Reset per-frame context, called on context initialisation as well as after
@@ -845,17 +845,17 @@ trans_emit_vertex_data(struct panfrost_context *ctx)
 
 		/* gl_Position varying is always last by convention */
 		if ((i + 1) == ctx->varying_count)
-			ctx->payload_tiler.position_varying = ctx->varying_mem.gpu + ctx->varying_height;
+			ctx->payload_tiler.postfix.position_varying = ctx->varying_mem.gpu + ctx->varying_height;
 
 		/* Varyings appear to need 64-byte alignment */
 		ctx->varying_height += ALIGN(varyings[i].size, 64);
 	}
 
-	ctx->payload_vertex.attributes = panfrost_upload(&ctx->cmdstream, attrs, ctx->vertex_buffer_count * sizeof(struct mali_attr), false);
+	ctx->payload_vertex.postfix.attributes = panfrost_upload(&ctx->cmdstream, attrs, ctx->vertex_buffer_count * sizeof(struct mali_attr), false);
 
 	mali_ptr varyings_p = panfrost_upload(&ctx->cmdstream, &varyings, ctx->varying_count * sizeof(struct mali_attr), false);
-	ctx->payload_vertex.varyings = varyings_p;
-	ctx->payload_tiler.varyings = varyings_p;
+	ctx->payload_vertex.postfix.varyings = varyings_p;
+	ctx->payload_tiler.postfix.varyings = varyings_p;
 }
 
 /* Go through dirty flags and actualise them in the cmdstream. */
@@ -874,7 +874,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_VS) {
 		assert(ctx->vs);
-		ctx->payload_vertex._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->vs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
+		ctx->payload_vertex.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->vs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
 		panfrost_reserve(&ctx->cmdstream_persistent, sizeof(struct mali_fragment_core));
 
 		/* Varying descriptor is tied to the vertex shader. Also the
@@ -886,18 +886,18 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 	if (ctx->dirty & PAN_DIRTY_FS) { 
 		assert(ctx->fs);
-		ctx->payload_tiler._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
+		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fs->tripipe, sizeof(struct mali_tripipe), true) >> 4;
 		panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VERTEX) {
-		ctx->payload_vertex.attribute_meta = panfrost_upload(&
+		ctx->payload_vertex.postfix.attribute_meta = panfrost_upload(&
 				ctx->cmdstream_persistent, &ctx->vertex->hw,
 				sizeof(struct mali_attr_meta) * ctx->vertex->num_elements, false);
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VIEWPORT) {
-		ctx->payload_tiler.viewport = panfrost_upload(&ctx->cmdstream, &ctx->viewport, sizeof(struct mali_viewport), false);
+		ctx->payload_tiler.postfix.viewport = panfrost_upload(&ctx->cmdstream, &ctx->viewport, sizeof(struct mali_viewport), false);
 	}
 
 	if (ctx->dirty & PAN_DIRTY_SAMPLERS) {
@@ -914,9 +914,9 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 			}
 
 			if (t == PIPE_SHADER_FRAGMENT)
-				ctx->payload_tiler.sampler_descriptor = samplers_base;
+				ctx->payload_tiler.postfix.sampler_descriptor = samplers_base;
 			else if (t == PIPE_SHADER_VERTEX)
-				ctx->payload_vertex.sampler_descriptor = samplers_base;
+				ctx->payload_vertex.postfix.sampler_descriptor = samplers_base;
 			else
 				assert(0);
 		}
@@ -960,9 +960,9 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 			mali_ptr trampoline = panfrost_upload(&ctx->cmdstream, trampolines, sizeof(uint64_t) * ctx->sampler_view_count[t], false);
 
 			if (t == PIPE_SHADER_FRAGMENT)
-				ctx->payload_tiler.texture_trampoline = trampoline;
+				ctx->payload_tiler.postfix.texture_trampoline = trampoline;
 			else if (t == PIPE_SHADER_VERTEX)
-				ctx->payload_vertex.texture_trampoline = trampoline;
+				ctx->payload_vertex.postfix.texture_trampoline = trampoline;
 			else
 				assert(0);
 		}
@@ -976,11 +976,11 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 			
 			switch (i) {
 				case PIPE_SHADER_VERTEX:
-					ctx->payload_vertex.uniforms = address;
+					ctx->payload_vertex.postfix.uniforms = address;
 					break;
 
 				case PIPE_SHADER_FRAGMENT:
-					ctx->payload_tiler.uniforms = address;
+					ctx->payload_tiler.postfix.uniforms = address;
 					break;
 
 				default:
@@ -1237,21 +1237,21 @@ panfrost_draw_vbo(
 	}
 #endif
 
-        ctx->payload_tiler.draw_mode = g2m_draw_mode(mode);
+        ctx->payload_tiler.prefix.draw_mode = g2m_draw_mode(mode);
 
 	ctx->vertex_count = info->count;
 
-        ctx->payload_vertex.vertex_count = MALI_POSITIVE(ctx->vertex_count);
-        ctx->payload_tiler.vertex_count = ctx->payload_vertex.vertex_count;
+        ctx->payload_vertex.prefix.invocation_count = MALI_POSITIVE(ctx->vertex_count);
+        ctx->payload_tiler.prefix.invocation_count = ctx->vertex_count;
 
 	if (info->index_size) {
-		ctx->payload_tiler.index_count = MALI_POSITIVE(info->count);
+		ctx->payload_tiler.prefix.index_count = MALI_POSITIVE(info->count);
 
 		//assert(!info->restart_index); /* TODO: Research */
 		assert(!info->index_bias);
 		//assert(!info->min_index); /* TODO: Use value */
 
-		ctx->payload_tiler.unknown_draw |= trans_translate_index_size(info->index_size);
+		ctx->payload_tiler.prefix.unknown_draw |= trans_translate_index_size(info->index_size);
 
 		const uint32_t *ibuf = NULL;
 
@@ -1262,16 +1262,16 @@ panfrost_draw_vbo(
 			ibuf = (const uint32_t *) rsrc->cpu[0];
 		}
 
-		ctx->payload_tiler.indices = panfrost_upload(&ctx->cmdstream, ibuf, info->count * info->index_size, true);
+		ctx->payload_tiler.prefix.indices = panfrost_upload(&ctx->cmdstream, ibuf, info->count * info->index_size, true);
 	} else {
 		/* Index count == vertex count, if no indexing is applied, as
 		 * if it is internally indexed in the expected order */
 
-		ctx->payload_tiler.index_count = ctx->payload_tiler.vertex_count;
+		ctx->payload_tiler.prefix.index_count = ctx->vertex_count;
 
 		/* Reverse index state */
-		ctx->payload_tiler.unknown_draw &= ~MALI_DRAW_INDEXED_UINT32;
-		ctx->payload_tiler.indices = (uintptr_t) NULL;
+		ctx->payload_tiler.prefix.unknown_draw &= ~MALI_DRAW_INDEXED_UINT32;
+		ctx->payload_tiler.prefix.indices = (uintptr_t) NULL;
 	}
 
 	/* Fire off the draw itself */
