@@ -763,8 +763,10 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 	};
 
 	/* XXX: What is this? */
+#ifdef T6XX
 	if (is_tiler)
 		job.unknown_flags = ctx->draw_count ? 64 : 1;
+#endif
 
 	/* Only tiler jobs have dependencies which are known at this point */
 
@@ -1102,14 +1104,12 @@ trans_link_jobs(struct panfrost_context *ctx)
 	}
 
 	/* V -> V/T ; T -> T/null */
-#if 0
 	for (int i = 0; i < ctx->draw_count; ++i) {
 		bool isLast = (i + 1) == ctx->draw_count;
 
 		trans_link_job_pair(ctx->cmdstream, ctx->vertex_jobs[i], isLast ? ctx->tiler_jobs[0] : ctx->vertex_jobs[i + 1]);
 		trans_link_job_pair(ctx->cmdstream, ctx->tiler_jobs[i], isLast ? 0 : ctx->tiler_jobs[i + 1]);
 	}
-#endif
 }
 
 /* Use to allocate atom numbers for jobs. We probably want to overhaul this in kernel space at some point. */
@@ -1300,7 +1300,9 @@ panfrost_draw_vbo(
 	ctx->vertex_count = info->count;
 
         ctx->payload_vertex.prefix.invocation_count = MALI_POSITIVE(ctx->vertex_count);
-        ctx->payload_tiler.prefix.invocation_count = ctx->vertex_count;
+        ctx->payload_tiler.prefix.invocation_count = MALI_POSITIVE(ctx->vertex_count);
+	
+	ctx->payload_tiler.prefix.unknown_draw |= 0x3000;
 
 	if (info->index_size) {
 		ctx->payload_tiler.prefix.index_count = MALI_POSITIVE(info->count);
@@ -1325,7 +1327,7 @@ panfrost_draw_vbo(
 		/* Index count == vertex count, if no indexing is applied, as
 		 * if it is internally indexed in the expected order */
 
-		ctx->payload_tiler.prefix.index_count = ctx->vertex_count;
+		ctx->payload_tiler.prefix.index_count = MALI_POSITIVE(ctx->vertex_count);
 
 		/* Reverse index state */
 		ctx->payload_tiler.prefix.unknown_draw &= ~MALI_DRAW_INDEXED_UINT32;
@@ -1354,7 +1356,12 @@ panfrost_create_rasterizer_state(
 	so->base = *cso;
 
 	/* Bitmask, unknown meaning of the start value */
+#ifdef T8XX
+	so->tiler_gl_enables = 0x7;
+#else
 	so->tiler_gl_enables = 0x105;
+#endif
+
 
 	so->tiler_gl_enables |= MALI_GL_FRONT_FACE(
 			cso->front_ccw ? MALI_GL_CCW : MALI_GL_CW);
@@ -2342,7 +2349,7 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->scratchpad, 16, true, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 0, 0);
-	trans_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->tiler_heap, 16384, false, false, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->misc_0, 32, false, false, 0, 0, 0);
 	trans_allocate_slab(ctx, &ctx->misc_1, 1, false, false, 0, 0, 0);
 
