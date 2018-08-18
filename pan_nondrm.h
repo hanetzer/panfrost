@@ -39,7 +39,7 @@ void* pandev_shader_compile(uint32_t *dst, const char *src, int type);
 struct panfrost_context;
 struct panfrost_shader_state;
 void
-panfrost_shader_compile(struct panfrost_context *ctx, struct mali_tripipe *meta, const char *src, int type, struct panfrost_shader_state *state);
+panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *meta, const char *src, int type, struct panfrost_shader_state *state);
 
 struct panfrost_memory {
 	uint8_t* cpu;

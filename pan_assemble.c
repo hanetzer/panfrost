@@ -78,7 +78,7 @@ pandev_shader_compile(uint32_t *dst, const char *src, int type)
 #endif
 
 void
-panfrost_shader_compile(struct panfrost_context *ctx, struct mali_tripipe *meta, const char *src, int type, struct panfrost_shader_state *state)
+panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *meta, const char *src, int type, struct panfrost_shader_state *state)
 {
 	uint8_t* dst;
 
