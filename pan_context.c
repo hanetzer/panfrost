@@ -942,9 +942,28 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 #undef COPY
 
-		/* XXX: MERGE IN FRAGMENT SHADER CORE PROPERTIES? */
-		//panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_fragment_core));
-		ctx->payload_vertex.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_shader_meta), true) >> 4;
+		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_shader_meta), true) >> 4;
+
+#ifdef T8XX
+		/* TODO: MERGE FOR WORKING BLENDING */
+		struct mali_blend_meta blend_meta[] = {
+			{
+				.unk1 = 0x200,
+				.blend_equation_1 = {
+					.rgb_mode = 0x122,
+					.alpha_mode = 0x122,
+					.color_mask = MALI_MASK_R | MALI_MASK_G | MALI_MASK_B | MALI_MASK_A,
+				},
+				.blend_equation_2 = {
+					.rgb_mode = 0x122,
+					.alpha_mode = 0x122,
+					.color_mask = MALI_MASK_R | MALI_MASK_G | MALI_MASK_B | MALI_MASK_A,
+				},
+			},
+		};
+
+		panfrost_upload_sequential(&ctx->cmdstream_persistent, blend_meta, sizeof(blend_meta));
+#endif
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VERTEX) {
