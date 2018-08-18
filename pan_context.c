@@ -53,8 +53,8 @@ trans_upload_varyings_descriptor(struct panfrost_context *ctx)
 {
         mali_ptr unknown6_1_p = panfrost_upload(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_0, sizeof(struct mali_unknown6), true);
         mali_ptr unknown6_2_p = panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_1, sizeof(struct mali_unknown6));
-        ctx->payload_vertex.unknown6 = (unknown6_1_p) | 0x0;
-        ctx->payload_tiler.unknown6 = (unknown6_2_p) | 0x8;
+        ctx->payload_vertex.postfix.varying_meta = (unknown6_1_p) | 0x0;
+        ctx->payload_tiler.postfix.varying_meta = (unknown6_2_p) | 0x8;
 }
 
 /* TODO: Sample size, etc */
