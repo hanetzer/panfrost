@@ -111,11 +111,10 @@ trans_emit_fbd(struct panfrost_context *ctx)
 		.height2 = MALI_POSITIVE(ctx->height),
 
 		.unk1 = 0x1080,
-		.unk3 = 0x100,
 
 		/* TODO: MRT */
 		.rt_count_1 = MALI_POSITIVE(1),
-		.rt_count_2 = 1,
+		.rt_count_2 = 4,
 
 		/* TODO: WTF is this structure? */
 		.zero1 = 0x1f,
@@ -152,6 +151,10 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 	}
 
         fb.format = 0xb84e0281; /* RGB32, no MSAA */
+
+	/* XXX: MRT case */
+	fb.rt_count_2 = 1;
+	fb.unk3 = 0x100,
 #else
 	struct bifrost_framebuffer fb = trans_emit_fbd(ctx);
 
@@ -467,7 +470,7 @@ trans_emit_tiler_payload(struct panfrost_context *ctx)
 		.prefix = {
 			.workgroups_z_shift = 32,
 			.workgroups_x_shift_2 = 0x2,
-			.workgroups_x_shift_3 = 0x5,
+			.workgroups_x_shift_3 = 0x6,
 			/* XXX: TODO */
 		},
 	};
