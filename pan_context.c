@@ -2395,7 +2395,7 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->misc_1, 32, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
-	trans_setup_framebuffer(ctx, NULL, 1366, 768);
+	trans_setup_framebuffer(ctx, NULL, 1920, 1080);
 #endif
 }
 
