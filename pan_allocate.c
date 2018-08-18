@@ -72,6 +72,7 @@ pandev_upload(int cheating_offset, int *stack_bottom, mali_ptr base, void *base_
 		offset = pandev_allocate_offset(stack_bottom, padded_size);
 	} else {
 		offset = cheating_offset;
+		*stack_bottom = offset + sz;
 	}
 
 	/* Save last offset for sequential uploads (job descriptors) */
@@ -102,7 +103,7 @@ panfrost_upload(struct panfrost_memory *mem, const void *data, size_t sz, bool n
 mali_ptr
 panfrost_upload_sequential(struct panfrost_memory *mem, const void *data, size_t sz)
 {
-	return pandev_upload_sequential(mem->gpu, mem->cpu, data, sz);
+	return pandev_upload(last_offset, &mem->stack_bottom, mem->gpu, mem->cpu, data, sz, true);
 }
 
 /* Simplified interface to allocate a chunk without any upload, to allow

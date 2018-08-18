@@ -762,10 +762,11 @@ trans_vertex_tiler_job(struct panfrost_context *ctx, bool is_tiler)
 #else
 	int offset = 4;
 #endif
+	printf("SZ %d, %d\n", sizeof(job), sizeof(*payload));
 
 	mali_ptr job_p = panfrost_upload(&ctx->cmdstream, &job, sizeof(job) - offset, true);
 	panfrost_upload_sequential(&ctx->cmdstream, payload, sizeof(*payload));
-
+	printf("Job (%d) at %llx\n", is_tiler, job_p);
 	return job_p;
 }
 
