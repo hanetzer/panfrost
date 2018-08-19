@@ -1011,14 +1011,14 @@ allocate_first_free_register(compiler_context *ctx)
 static int
 normal_ssa_to_register(compiler_context *ctx, midgard_instruction *ins, int ssa)
 {
-	int reg = _mesa_hash_table_u64_search(ctx->ssa_to_register, ssa);
+	int reg = _mesa_hash_table_u64_search(ctx->ssa_to_register, ssa + 1);
 
 	if (reg) {
 		reg -= 1; /* Intentional off-by-one */
 	} else {
 		/* XXX: Proper register allocation */
 		reg = allocate_first_free_register(ctx);
-		_mesa_hash_table_u64_insert(ctx->ssa_to_register, ssa, (void *) (uintptr_t) (reg + 1));
+		_mesa_hash_table_u64_insert(ctx->ssa_to_register, ssa + 1, (void *) (uintptr_t) (reg + 1));
 	}
 
 	/* Free the register if possible */
