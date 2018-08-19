@@ -140,7 +140,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 
     if (type == JOB_TYPE_VERTEX) {
 	    meta->attribute_count = 3;
-	    meta->varying_count = 4;
+	    meta->varying_count = 3;
 	    meta->midgard1.uniform_count = 12;
 	    meta->midgard1.unknown1 = 1; /* XXX: WTF is this?! */
     } else {
@@ -161,7 +161,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 
     if (type == JOB_TYPE_VERTEX) {
 	    /* vec4 */
-	    ctx->varyings_stride[0] = 4 * sizeof(float);
+	    ctx->varyings_stride[0] = 2 * sizeof(float);
 
 	    /* gl_Position */
 	    ctx->varyings_stride[1] = 4 * sizeof(float);
@@ -188,6 +188,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 		    .nr_components = MALI_POSITIVE(4),
 		    .not_normalised = 1,
 		    .unknown1 = 0x1a22,
+		    .is_int_signed = 1,
 #ifdef T6XX
 		    .unknown2 = 1,
 #endif

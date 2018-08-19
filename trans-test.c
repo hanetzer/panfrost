@@ -166,7 +166,7 @@ int main(int argc, const char **argv)
 			(struct pipe_sampler_view **) texs);
 #endif
 
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < 100; ++i) {
 #if 0
 	const struct pipe_rasterizer_state stat = {
 		.line_width = 10.0f,
