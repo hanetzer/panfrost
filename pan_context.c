@@ -469,6 +469,8 @@ trans_emit_tiler_payload(struct panfrost_context *ctx)
 			.workgroups_x_shift_2 = 0x2,
 			.workgroups_x_shift_3 = 0x6,
 			/* XXX: TODO */
+
+			.zero1 = 0xffff, /* Why is this only seen on test-quad-textured? */
 		},
 	};
 
@@ -1021,8 +1023,12 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 				int s = ctx->sampler_views[t][i]->hw.nr_mipmap_levels;
 
 				if (!rsrc->is_mipmap) {
+#ifdef T6XX
+					/* HW ERRATA, not needed after T6XX */
 					ctx->sampler_views[t][i]->hw.swizzled_bitmaps[1] = rsrc->gpu[0];
+
 					ctx->sampler_views[t][i]->hw.unknown3A = 1;
+#endif
 					ctx->sampler_views[t][i]->hw.nr_mipmap_levels = 0;
 				}
 
@@ -1333,7 +1339,7 @@ panfrost_draw_vbo(
         ctx->payload_vertex.prefix.invocation_count = MALI_POSITIVE(ctx->vertex_count);
         ctx->payload_tiler.prefix.invocation_count = MALI_POSITIVE(ctx->vertex_count);
 	
-	ctx->payload_tiler.prefix.unknown_draw |= 0x3000;
+	ctx->payload_tiler.prefix.unknown_draw |= /*0x3000*/0x18000;
 
 	if (info->index_size) {
 		ctx->payload_tiler.prefix.index_count = MALI_POSITIVE(info->count);

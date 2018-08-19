@@ -132,12 +132,10 @@ int main(int argc, const char **argv)
 		.swizzle_a = PIPE_SWIZZLE_W,
 	};
 
-	uint8_t bitmap_data[568 * 770 * 4] = { 127 };
+	uint8_t bitmap_data[568 * 770 * 4];
 
-#if 0
-	FILE *fp = fopen("/home/guest/img.bin", "rb");
+	FILE *fp = fopen("/home/alyssa/img.bin", "rb");
 	fread(bitmap_data, 1, sizeof(bitmap_data), fp);
-#endif
 
 	templ.width0 = 568;
 	templ.height0 = 770;
