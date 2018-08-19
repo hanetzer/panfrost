@@ -114,8 +114,6 @@ int main(int argc, const char **argv)
 	gallium->bind_rasterizer_state(gallium,
 			gallium->create_rasterizer_state(gallium, &state));
 
-#if 0
-
 	struct pipe_sampler_state sampler_state = {
 		.wrap_s = PIPE_TEX_WRAP_REPEAT,
 		.wrap_t = PIPE_TEX_WRAP_REPEAT,
@@ -134,10 +132,12 @@ int main(int argc, const char **argv)
 		.swizzle_a = PIPE_SWIZZLE_W,
 	};
 
-	uint8_t bitmap_data[568 * 770 * 4];
+	uint8_t bitmap_data[568 * 770 * 4] = { 127 };
 
+#if 0
 	FILE *fp = fopen("/home/guest/img.bin", "rb");
 	fread(bitmap_data, 1, sizeof(bitmap_data), fp);
+#endif
 
 	templ.width0 = 568;
 	templ.height0 = 770;
@@ -164,7 +164,6 @@ int main(int argc, const char **argv)
 			PIPE_SHADER_FRAGMENT,
 			0, 2,
 			(struct pipe_sampler_view **) texs);
-#endif
 
     for (int i = 0; i < 1000; ++i) {
 #if 0
