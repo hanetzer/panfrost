@@ -87,7 +87,6 @@ int main(int argc, const char **argv)
 	//gallium->set_constant_buffer(gallium, PIPE_SHADER_VERTEX, 0, &consts);
 #endif
 
-	/*
 	uint32_t indices[] = {
 		0, 1, 2,
 		1, 0, 3,
@@ -98,7 +97,6 @@ int main(int argc, const char **argv)
 	struct pipe_transfer *transfer3;
 	struct pipe_resource *ibuf = screen->resource_create(screen, &templ);
 	memcpy(gallium->transfer_map(gallium, ibuf, 0, 0, &box, &transfer3), indices, sizeof(indices));
-	*/
 
 
 	memcpy(attrib_trans,
@@ -186,9 +184,9 @@ int main(int argc, const char **argv)
 
 	struct pipe_draw_info info = {
 		.start = 0,
-		.count = 3,
-		//.index_size = 4,
-		//.index = { .resource = ibuf },
+		.count = 9,
+		.index_size = 4,
+		.index = { .resource = ibuf },
 		.mode = PIPE_PRIM_TRIANGLE_STRIP
 	};
 
