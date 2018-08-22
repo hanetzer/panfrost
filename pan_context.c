@@ -64,8 +64,12 @@ trans_set_framebuffer_msaa(struct panfrost_context *ctx, bool enabled)
 {
 	SET_BIT(ctx->fragment_shader_core.unknown2_3, MALI_HAS_MSAA, enabled);
 	SET_BIT(ctx->fragment_shader_core.unknown2_4, MALI_NO_MSAA, !enabled);
-	//SET_BIT(ctx->fragment_fbd.format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
-	/* XXX: T8xx */
+
+#ifdef SFBD
+	SET_BIT(ctx->fragment_fbd.format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
+#else
+	SET_BIT(ctx->fragment_rts[0].format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
+#endif
 }
 
 /* Framebuffer descriptor */
@@ -914,7 +918,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		ctx->payload_tiler.line_width = ctx->rasterizer->base.line_width;
 		ctx->payload_tiler.gl_enables = ctx->rasterizer->tiler_gl_enables;
 
-		//trans_set_framebuffer_msaa(ctx, FORCE_MSAA || ctx->rasterizer->base.multisample);
+		trans_set_framebuffer_msaa(ctx, FORCE_MSAA || ctx->rasterizer->base.multisample);
 	}
 
 	if (ctx->dirty & PAN_DIRTY_VS) {
