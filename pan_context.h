@@ -88,6 +88,7 @@ struct panfrost_context {
 	struct panfrost_memory framebuffer;
 	struct panfrost_memory misc_0;
 	struct panfrost_memory misc_1;
+	struct panfrost_memory depth_stencil_buffer;
 
 	/* Common framebuffer settings */
 	int width;
@@ -108,6 +109,9 @@ struct panfrost_context {
 	struct mali_single_framebuffer fragment_fbd;
 #else
 	struct bifrost_framebuffer fragment_fbd;
+
+	struct bifrost_fb_extra fragment_extra;
+
 	struct bifrost_render_target fragment_rts[4];
 #endif
 
@@ -130,8 +134,6 @@ struct panfrost_context {
 	mali_ptr set_value_job;
 	mali_ptr vertex_jobs[MAX_DRAW_CALLS];
 	mali_ptr tiler_jobs[MAX_DRAW_CALLS];
-
-	mali_ptr depth_stencil_buffer;
 
 	/* Dirty flags are setup like any other driver */
 	int dirty;

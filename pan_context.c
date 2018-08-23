@@ -155,12 +155,12 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 	}
 
         fb.format = 0xb84e0281; /* RGB32, no MSAA */
+#else
+	struct bifrost_framebuffer fb = trans_emit_fbd(ctx);
 
 	/* XXX: MRT case */
 	fb.rt_count_2 = 1;
-	fb.unk3 = 0x100,
-#else
-	struct bifrost_framebuffer fb = trans_emit_fbd(ctx);
+	fb.unk3 = 0x100;
 
 	struct bifrost_render_target rt = {
 		.unk1 = 0x4000000,
@@ -235,12 +235,8 @@ panfrost_clear(
 		buffer_color->clear_color_4 = packed_color;
 	}
 
-	/* TODO: MFBD depth/stencil */
 	if (clear_depth) {
 #ifdef SFBD
-		buffer_ds->depth_buffer = ctx->depth_stencil_buffer;
-		buffer_ds->depth_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
-
 		buffer_ds->clear_depth_1 = depth;
 		buffer_ds->clear_depth_2 = depth;
 		buffer_ds->clear_depth_3 = depth;
@@ -251,15 +247,33 @@ panfrost_clear(
 	}
 
 	if (clear_stencil) {
-#ifdef SFBD
-		buffer_ds->stencil_buffer = ctx->depth_stencil_buffer;
-		buffer_ds->stencil_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
-#endif
-
 		buffer_ds->clear_stencil = stencil;
 	}
 
-	/* Set flags based on what has been cleared */
+	/* Setup buffers depending on MFBD/SFBD */
+
+#ifdef MFBD
+	if (clear_depth || clear_stencil) {
+		/* Setup combined 24/8 depth/stencil */
+		ctx->fragment_fbd.unk3 |= MALI_MFBD_EXTRA;
+		ctx->fragment_extra.unk = 0x405;
+		ctx->fragment_extra.ds_linear.depth = ctx->depth_stencil_buffer.gpu;
+		ctx->fragment_extra.ds_linear.depth_stride = ctx->width * 4;
+	}
+#else
+	if (clear_depth) {
+		buffer_ds->depth_buffer = ctx->depth_stencil_buffer.gpu;
+		buffer_ds->depth_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
+	}
+
+	if (clear_stencil) {
+		buffer_ds->stencil_buffer = ctx->depth_stencil_buffer.gpu;
+		buffer_ds->stencil_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
+	}
+#endif
+
+#ifdef SFBD
+	/* Set flags based on what has been cleared, for the SFBD case */
 	/* XXX: What do these flags mean? */
 	int clear_flags = 0x101100;
 
@@ -274,7 +288,6 @@ panfrost_clear(
 			clear_flags |= MALI_CLEAR_SLOW_STENCIL;
 	}
 
-#ifdef SFBD
 	fbd->clear_flags = clear_flags;
 #endif
 
@@ -857,8 +870,13 @@ trans_fragment_job(struct panfrost_context *ctx)
 
 	mali_ptr fbd = panfrost_upload(&ctx->cmdstream, &ctx->fragment_fbd, sizeof(ctx->fragment_fbd), true);
 
+	/* Upload extra framebuffer info if necessary */
+	if (ctx->fragment_fbd.unk3 & MALI_MFBD_EXTRA) {
+		panfrost_upload_sequential(&ctx->cmdstream, &ctx->fragment_extra, sizeof(struct bifrost_fb_extra));
+	}
+
 	/* Upload (single) render target */
-	mali_ptr rt = panfrost_upload(&ctx->cmdstream, &ctx->fragment_rts[0], sizeof(struct bifrost_render_target) * 1, true);
+	panfrost_upload_sequential(&ctx->cmdstream, &ctx->fragment_rts[0], sizeof(struct bifrost_render_target) * 1);
 
 	/* Generate the fragment (frame) job */
 
@@ -1296,6 +1314,7 @@ panfrost_flush(
 #ifndef DRY_RUN
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
+	printf("%x\n", ctx->depth_stencil_buffer.cpu[0]);
 #endif
 #endif
 }	
@@ -1853,7 +1872,7 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 	if (template->height0) sz *= template->height0;
 	if (template->depth0) sz *= template->depth0;
 
-	if (!(template->bind & PIPE_BIND_DISPLAY_TARGET)) {
+	if (!(template->bind & (PIPE_BIND_DISPLAY_TARGET | PIPE_BIND_DEPTH_STENCIL))) {
 		/* TODO: For linear resources, allocate straight on the cmdstream for
 		 * zero-copy operation */
 
@@ -1929,6 +1948,14 @@ panfrost_transfer_map(struct pipe_context *pctx,
 		/* Set the CPU mapping to that of the framebuffer in memory, untiled */
 		rsrc->cpu[level] = ctx->framebuffer.cpu;
 		printf("Display target so %p\n", ctx->framebuffer.cpu);
+	} else if (resource->bind & PIPE_BIND_DEPTH_STENCIL) {
+		/* Mipmapped readpixels?! */
+		assert(level == 0);
+
+		/* Set the CPU mapping to that of the depth/stencil buffer in memory, untiled */
+		rsrc->cpu[level] = ctx->depth_stencil_buffer.cpu;
+		printf("DS target so %p\n", ctx->depth_stencil_buffer.cpu);
+
 	}
 
 	return rsrc->cpu[level] + transfer->box.x + transfer->box.y * transfer->stride;
@@ -2399,6 +2426,7 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	/* TODO: Reenable imports when we understand the new kernel API */
 
 	trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
+	trans_allocate_slab(ctx, &ctx->depth_stencil_buffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
 	struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
 	ctx->stride = info.stride;
 
