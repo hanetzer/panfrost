@@ -219,6 +219,12 @@ panfrost_clear(
 	struct mali_single_framebuffer* buffer_color = &ctx->fragment_fbd;
 #endif
 
+#ifdef MFBD
+	struct bifrost_framebuffer *buffer_ds = &ctx->fragment_fbd;
+#else
+	struct mali_single_framebuffer *buffer_ds = buffer_color;
+#endif
+
 	if (clear_color) {
 		/* Fields duplicated 4x for unknown reasons. Same in Utgard,
 		 * too, which is doubly weird. */
@@ -230,24 +236,27 @@ panfrost_clear(
 	}
 
 	/* TODO: MFBD depth/stencil */
-#ifdef SFBD
-	struct mali_single_framebuffer *fbd = &ctx->fragment_fbd;
-
 	if (clear_depth) {
-		fbd->depth_buffer = ctx->depth_stencil_buffer;
-		fbd->depth_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
+#ifdef SFBD
+		buffer_ds->depth_buffer = ctx->depth_stencil_buffer;
+		buffer_ds->depth_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
 
-		fbd->clear_depth_1 = depth;
-		fbd->clear_depth_2 = depth;
-		fbd->clear_depth_3 = depth;
-		fbd->clear_depth_4 = depth;
+		buffer_ds->clear_depth_1 = depth;
+		buffer_ds->clear_depth_2 = depth;
+		buffer_ds->clear_depth_3 = depth;
+		buffer_ds->clear_depth_4 = depth;
+#else
+		buffer_ds->clear_depth = depth;
+#endif
 	}
 
 	if (clear_stencil) {
-		fbd->stencil_buffer = ctx->depth_stencil_buffer;
-		fbd->stencil_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
+#ifdef SFBD
+		buffer_ds->stencil_buffer = ctx->depth_stencil_buffer;
+		buffer_ds->stencil_buffer_enable = MALI_DEPTH_STENCIL_ENABLE;
+#endif
 
-		fbd->clear_stencil = stencil;
+		buffer_ds->clear_stencil = stencil;
 	}
 
 	/* Set flags based on what has been cleared */
@@ -265,6 +274,7 @@ panfrost_clear(
 			clear_flags |= MALI_CLEAR_SLOW_STENCIL;
 	}
 
+#ifdef SFBD
 	fbd->clear_flags = clear_flags;
 #endif
 
