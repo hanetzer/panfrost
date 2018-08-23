@@ -256,9 +256,11 @@ panfrost_clear(
 	if (clear_depth || clear_stencil) {
 		/* Setup combined 24/8 depth/stencil */
 		ctx->fragment_fbd.unk3 |= MALI_MFBD_EXTRA;
+		//ctx->fragment_extra.unk = /*0x405*/0x404;
 		ctx->fragment_extra.unk = 0x405;
-		ctx->fragment_extra.ds_linear.depth = ctx->depth_stencil_buffer.gpu;
+		ctx->fragment_extra.ds_linear.depth = /*ctx->depth_stencil_buffer.gpu*/0xDEADBEEF;
 		ctx->fragment_extra.ds_linear.depth_stride = ctx->width * 4;
+		printf("Setup\n");
 	}
 #else
 	if (clear_depth) {
@@ -891,7 +893,7 @@ trans_fragment_job(struct panfrost_context *ctx)
 	struct mali_payload_fragment payload = {
 		.min_tile_coord = MALI_COORDINATE_TO_TILE_MIN(0, 0),
 		.max_tile_coord = MALI_COORDINATE_TO_TILE_MAX(ctx->width, ctx->height),
-		.framebuffer = fbd | PANFROST_DEFAULT_FBD,
+		.framebuffer = fbd | PANFROST_DEFAULT_FBD | (ctx->fragment_fbd.unk3 & MALI_MFBD_EXTRA ? 2 : 0),
 	};
 
 	/* Normally, there should be no padding. However, fragment jobs are
