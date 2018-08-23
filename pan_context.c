@@ -1272,7 +1272,6 @@ panfrost_flush(
 		unsigned flags)
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
-	printf("Fluuush\n");
 
 	/* If there is nothing drawn, skip the frame */
 	if (!ctx->draw_count && !(ctx->dirty & PAN_DIRTY_DUMMY)) return;
@@ -1289,7 +1288,6 @@ panfrost_flush(
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
 #endif
 #endif
-	printf("%X\n", ctx->framebuffer.cpu[0]);
 }	
 
 #define DEFINE_CASE(c) case PIPE_PRIM_##c: return MALI_GL_##c;
