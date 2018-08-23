@@ -182,6 +182,13 @@ normalised_float_to_u8(float f) {
 }
 
 static void
+panfrost_flush(
+		struct pipe_context *pipe,
+		struct pipe_fence_handle ** fence,
+		unsigned flags);
+
+
+static void
 panfrost_clear(
 		struct pipe_context *pipe,
 		unsigned buffers,
@@ -260,6 +267,8 @@ panfrost_clear(
 
 	fbd->clear_flags = clear_flags;
 #endif
+
+	panfrost_flush(pipe, NULL, 0);
 }
 
 static void
@@ -1173,6 +1182,22 @@ allocate_atom()
 
 int last_fragment_id = -1;
 
+/* Forces a flush, to make sure everything is consistent.
+ * Bad for parallelism. Necessary for glReadPixels etc. Use cautiously.
+ */
+
+static void
+force_flush_fragment(struct panfrost_context *ctx)
+{
+	if (last_fragment_id != -1) {
+		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
+
+		do {
+			read(ctx->fd, ev, sizeof(ev));
+		} while (ev[4] != last_fragment_id);
+	}
+}
+
 /* The entire frame is in memory -- send it off to the kernel! */
 
 static void
@@ -1187,23 +1212,8 @@ trans_submit_frame(struct panfrost_context *ctx)
 	ctx->draw_count = 0;
 
 #ifndef DRY_RUN
-	if (last_fragment_id != -1) {
-#if 0
-		/* Pipelined draws */
-		struct pollfd ufd = {
-			.fd = ctx->fd,
-			.events = POLLIN | POLLOUT,
-			.revents = 0
-		};
-
-		poll(&ufd, 1, 16);
-#endif
-
-		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
-		do {
-			read(ctx->fd, ev, sizeof(ev));
-		} while (ev[4] != last_fragment_id);
-	}
+	/* XXX: FLUSH SHOULD HAPPEN HERE */
+	//force_flush_fragment(ctx);
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1249,6 +1259,9 @@ trans_submit_frame(struct panfrost_context *ctx)
 	    printf("Error submitting\n");
 
 	last_fragment_id = atoms[1].atom_number;
+
+	/* XXX XXX XXX THIS KILLS PERF */
+	force_flush_fragment(ctx);
 #endif
 }
 
@@ -1259,6 +1272,7 @@ panfrost_flush(
 		unsigned flags)
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
+	printf("Fluuush\n");
 
 	/* If there is nothing drawn, skip the frame */
 	if (!ctx->draw_count && !(ctx->dirty & PAN_DIRTY_DUMMY)) return;
@@ -1275,6 +1289,7 @@ panfrost_flush(
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
 #endif
 #endif
+	printf("%X\n", ctx->framebuffer.cpu[0]);
 }	
 
 #define DEFINE_CASE(c) case PIPE_PRIM_##c: return MALI_GL_##c;
@@ -1816,10 +1831,6 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 #ifdef HAVE_DRI3
 	pipe_reference_init(&so->base.reference, 1);
 
-	if (template->bind & PIPE_BIND_DISPLAY_TARGET) {
-		printf("Bind screen\n");
-	}
-
 	/* Fill out fields based on format itself */
 	so->bytes_per_pixel = util_format_get_blocksize(template->format);
 #else
@@ -1834,12 +1845,14 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 	if (template->height0) sz *= template->height0;
 	if (template->depth0) sz *= template->depth0;
 
-	/* TODO: For linear resources, allocate straight on the cmdstream for
-	 * zero-copy operation */
+	if (!(template->bind & PIPE_BIND_DISPLAY_TARGET)) {
+		/* TODO: For linear resources, allocate straight on the cmdstream for
+		 * zero-copy operation */
 
-	for (int l = 0; l < (template->last_level + 1); ++l) {
-		so->cpu[l] = malloc(sz);
-		//sz >>= 2;
+		for (int l = 0; l < (template->last_level + 1); ++l) {
+			so->cpu[l] = malloc(sz);
+			//sz >>= 2;
+		}
 	}
 
 	return (struct pipe_resource *)so;
@@ -1868,6 +1881,7 @@ panfrost_transfer_map(struct pipe_context *pctx,
                       const struct pipe_box *box,
                       struct pipe_transfer **out_transfer)
 {
+	struct panfrost_context *ctx = panfrost_context(pctx);
 	struct panfrost_resource *rsrc = (struct panfrost_resource *) resource;
 
 	struct pipe_transfer *transfer = CALLOC_STRUCT(pipe_transfer);
@@ -1898,6 +1912,15 @@ panfrost_transfer_map(struct pipe_context *pctx,
 			default:
 				break;
 		}
+	}
+
+	if (resource->bind & PIPE_BIND_DISPLAY_TARGET) {
+		/* Mipmapped readpixels?! */
+		assert(level == 0);
+
+		/* Set the CPU mapping to that of the framebuffer in memory, untiled */
+		rsrc->cpu[level] = ctx->framebuffer.cpu;
+		printf("Display target so %p\n", ctx->framebuffer.cpu);
 	}
 
 	return rsrc->cpu[level] + transfer->box.x + transfer->box.y * transfer->stride;
