@@ -985,11 +985,16 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 #ifdef T8XX
 		/* Additional blend descriptor tacked on for newer systems */
-		printf("BEEEEP %X\n", ctx->fragment_shader_core.blend_equation.rgb_mode);
+
+		/* XXX: Less ugly way to do this? */
+		bool no_blending =
+			(ctx->fragment_shader_core.blend_equation.rgb_mode == 0x122) &&
+			(ctx->fragment_shader_core.blend_equation.alpha_mode == 0x122) &&
+			(ctx->fragment_shader_core.blend_equation.color_mask == 0xf);
 
 		struct mali_blend_meta blend_meta[] = {
 			{
-				.unk1 = 0x200,
+				.unk1 = 0x200 | (!no_blending ? 1 : 0),
 				.blend_equation_1 = ctx->fragment_shader_core.blend_equation,
 				.blend_equation_2 = ctx->fragment_shader_core.blend_equation
 			},
