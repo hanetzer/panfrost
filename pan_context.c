@@ -114,7 +114,7 @@ trans_emit_fbd(struct panfrost_context *ctx)
     trans_set_framebuffer_resolution(&framebuffer, ctx->width, ctx->height);
 #else
 	struct bifrost_framebuffer framebuffer = {
-		.tiler_meta = 0xf000000c00,
+		.tiler_meta = 0xf00000c600,
 
 		.width1 = MALI_POSITIVE(ctx->width),
 		.height1 = MALI_POSITIVE(ctx->height),
@@ -2431,7 +2431,7 @@ trans_setup_hardware(struct panfrost_context *ctx)
 	trans_allocate_slab(ctx, &ctx->misc_0, 64, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
-	trans_setup_framebuffer(ctx, NULL, 1920, 1080);
+	trans_setup_framebuffer(ctx, NULL, 2048, 1280);
 #endif
 }
 
