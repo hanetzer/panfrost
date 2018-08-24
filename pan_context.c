@@ -128,12 +128,19 @@ trans_emit_fbd(struct panfrost_context *ctx)
 		.rt_count_2 = 4,
 
 		/* TODO: WTF is this structure? */
+		/* unknown2 */
 		.zero1 = 0x1f,
+
+		/* Presumably corresponds to unknown_address_X of SFBD */
 		.zero2 = ctx->scratchpad.gpu,
 		.zero5 = ctx->misc_0.gpu,
 		.zero6 = ctx->misc_0.gpu + 512,
+
+		/* tiler_heap_start */
 		.zero7 = ctx->tiler_heap.gpu,
-		.zero8 = ctx->tiler_heap.gpu + 4096*32768,
+		
+		/* tiler_heap_end */
+		.zero8 = ctx->tiler_heap.gpu + ctx->tiler_heap.size,
 	};
 
 #endif
