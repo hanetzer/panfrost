@@ -25,7 +25,6 @@
 #include <assert.h>
 #include "pan_nondrm.h"
 
-#ifdef HAVE_DRI3
 #include "pipe/p_compiler.h"
 #include "pipe/p_config.h"
 #include "pipe/p_context.h"
@@ -34,9 +33,6 @@
 #include "pipe/p_screen.h"
 #include "pipe/p_state.h"
 #include "util/u_blitter.h"
-#else
-#include "extrapipe/pipe.h"
-#endif
 
 /* Forward declare to avoid extra header dep */
 struct prim_convert_context;
@@ -173,9 +169,7 @@ struct panfrost_context {
 	int sampler_view_count[PIPE_SHADER_TYPES];
 
 	struct primconvert_context *primconvert;
-#ifdef HAVE_DRI3
 	struct blitter_context *blitter;
-#endif
 
 	struct pipe_viewport_state *viewports;
 	struct pipe_scissor_state *scissors;

@@ -17,7 +17,6 @@
 #include "pan_context.h"
 #include "pan_swizzle.h"
 
-#ifdef HAVE_DRI3
 #include "util/macros.h"
 #include "util/u_format.h"
 #include "util/u_inlines.h"
@@ -28,7 +27,6 @@
 #include "indices/u_primconvert.h"
 
 #include "pan_screen.h"
-#endif
 
 static void
 panfrost_flush(
@@ -1365,7 +1363,7 @@ panfrost_draw_vbo(
 	ctx->payload_tiler.draw_start = info->start;
 
 	int mode = info->mode;
-#ifdef HAVE_DRI3
+
 	/* Fallback for non-ES draw modes */
 
 	if (info->mode >= PIPE_PRIM_QUADS) {
@@ -1376,7 +1374,6 @@ panfrost_draw_vbo(
 		printf("Fallback\n");
 		return; */
 	}
-#endif
 
         ctx->payload_tiler.prefix.draw_mode = g2m_draw_mode(mode);
 
@@ -1484,7 +1481,6 @@ panfrost_create_vertex_elements_state(
 		/* XXX: What if they're all packed into the same buffer? */
 		so->hw[i].index = elements[i].vertex_buffer_index;
 		
-#ifdef HAVE_DRI3
 		enum pipe_format fmt = elements[i].src_format;
 		const struct util_format_description *desc = util_format_description(fmt);
 		struct util_format_channel_description chan = desc->channel[0];
@@ -1523,13 +1519,6 @@ panfrost_create_vertex_elements_state(
 			(chan.type == UTIL_FORMAT_TYPE_SIGNED) ? 1 :
 			(chan.type == UTIL_FORMAT_TYPE_FLOAT && chan.size != 32) ? 1 :
 			0;
-#else
-		so->hw[i].type = 7;
-		so->hw[i].nr_components = MALI_POSITIVE(4);
-		so->nr_components[i] = 4;
-                so->hw[i].not_normalised = 1;
-		so->hw[i].is_int_signed = 0;
-#endif
 
                 so->hw[i].unknown1 = 0x2a22;
                 so->hw[i].unknown2 = 0x1;
@@ -1758,9 +1747,7 @@ panfrost_create_sampler_view(
 {
 	struct panfrost_sampler_view *so = CALLOC_STRUCT(panfrost_sampler_view);
 
-#ifdef HAVE_DRI3
 	pipe_reference(NULL, &texture->reference);
-#endif
 
 	struct panfrost_resource *prsrc = (struct panfrost_resource *) texture;
 
@@ -1855,14 +1842,11 @@ panfrost_resource_create_front(struct pipe_screen *screen,
 
 	so->base = *template;
 	so->base.screen = screen;
-#ifdef HAVE_DRI3
+
 	pipe_reference_init(&so->base.reference, 1);
 
 	/* Fill out fields based on format itself */
 	so->bytes_per_pixel = util_format_get_blocksize(template->format);
-#else
-	so->bytes_per_pixel = 4;
-#endif
 
 	/* TODO: Alignment? */
 	so->stride = so->bytes_per_pixel * template->width0;
@@ -1919,11 +1903,7 @@ panfrost_transfer_map(struct pipe_context *pctx,
 	transfer->stride = rsrc->stride;
 	assert(!transfer->box.z);
 
-#ifdef HAVE_DRI3
         pipe_resource_reference(&transfer->resource, resource);
-#else
-	transfer->resource = resource;
-#endif
 
 	*out_transfer = transfer;
 
@@ -1967,7 +1947,6 @@ static void
 panfrost_set_framebuffer_state(struct pipe_context *pctx,
                                const struct pipe_framebuffer_state *fb)
 {
-#ifdef HAVE_DRI3
 	struct panfrost_context *ctx = panfrost_context(pctx);
 
    for (int i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
@@ -1994,7 +1973,6 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
    ctx->pipe_framebuffer.height = fb->height;
    ctx->pipe_framebuffer.samples = fb->samples;
    ctx->pipe_framebuffer.layers = fb->layers;
-#endif
 }
 
 #define mem_dup(mem, sz) (memcpy(malloc(sz), mem, sz))
@@ -2117,7 +2095,6 @@ panfrost_create_surface(struct pipe_context *pipe,
 {
    struct pipe_surface *ps = NULL;
 
-#ifdef HAVE_DRI3
    ps = CALLOC_STRUCT(pipe_surface);
    if (ps) {
       pipe_reference_init(&ps->reference, 1);
@@ -2142,7 +2119,6 @@ panfrost_create_surface(struct pipe_context *pipe,
          assert(ps->u.buf.last_element < ps->width);
       }
    }
-#endif
 
    return ps;
 }
@@ -2151,11 +2127,9 @@ static void
 panfrost_surface_destroy(struct pipe_context *pipe,
                          struct pipe_surface *surf)
 {
-#ifdef HAVE_DRI3
    assert(surf->texture);
    pipe_resource_reference(&surf->texture, NULL);
    free(surf);
-#endif
 }
 
 static void
@@ -2228,10 +2202,8 @@ panfrost_destroy(struct pipe_context *pipe)
 {
 	struct panfrost_context *panfrost = panfrost_context(pipe);
 
-#ifdef HAVE_DRI3
 	if (panfrost->blitter)
 		util_blitter_destroy(panfrost->blitter);
-#endif
 }
 
 static void
@@ -2268,10 +2240,8 @@ panfrost_transfer_unmap(struct pipe_context *pctx,
 		}
 	}
 
-#ifdef HAVE_DRI3
 	/* Derefence the resource */
         pipe_resource_reference(&transfer->resource, NULL);
-#endif
 
 	/* Transfer itself is CALLOCed at the moment */
 	free(transfer);
@@ -2455,7 +2425,6 @@ trans_setup_hardware(struct panfrost_context *ctx)
 #endif
 }
 
-#ifdef HAVE_DRI3
 static const struct u_transfer_vtbl transfer_vtbl = {
         .resource_create          = panfrost_resource_create,
         .resource_destroy         = panfrost_resource_destroy,
@@ -2466,7 +2435,6 @@ static const struct u_transfer_vtbl transfer_vtbl = {
         //.set_stencil              = panfrost_resource_set_stencil,
         //.get_stencil              = panfrost_resource_get_stencil,
 };
-#endif
 
 /* New context creation, which also does hardware initialisation since I don't
  * know the better way to structure this :smirk: */
@@ -2477,9 +2445,7 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	screen->resource_create = panfrost_resource_create;
 	screen->resource_destroy = panfrost_resource_destroy;
 	screen->resource_create_front = panfrost_resource_create_front;
-#ifdef HAVE_DRI3
 	screen->transfer_helper = u_transfer_helper_create(&transfer_vtbl, true, true, true);
-#endif
 
 	struct panfrost_context *ctx = CALLOC_STRUCT(panfrost_context);
 	memset(ctx, 0, sizeof(*ctx));
@@ -2494,12 +2460,10 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 	gallium->transfer_map = panfrost_transfer_map;
 	gallium->transfer_unmap = panfrost_transfer_unmap;
 
-#ifdef HAVE_DRI3
 	gallium->transfer_flush_region = u_transfer_helper_transfer_flush_region;
 	gallium->buffer_subdata = u_default_buffer_subdata;
 	gallium->texture_subdata = u_default_texture_subdata;
 	gallium->clear_texture = util_clear_texture;
-#endif
 
 	gallium->create_surface = panfrost_create_surface;
 	gallium->surface_destroy = panfrost_surface_destroy;
@@ -2557,7 +2521,6 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
 	gallium->blit = panfrost_blit;
 
-#ifdef HAVE_DRI3
 	/* XXX: leaks */
 	gallium->stream_uploader = u_upload_create_default(gallium);
 	gallium->const_uploader = gallium->stream_uploader;
@@ -2569,7 +2532,6 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
 
 	ctx->blitter = util_blitter_create(gallium);
 	assert(ctx->blitter);
-#endif
 
 	/* Prepare for render! */
 	trans_setup_hardware(ctx);

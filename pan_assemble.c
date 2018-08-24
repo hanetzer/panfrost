@@ -70,19 +70,16 @@ pandev_shader_compile(uint32_t *dst, const char *src, int type)
 
 #include "pan_context.h"
 
-#ifdef HAVE_DRI3
 #include "compiler/nir/nir.h"
 #include "nir/tgsi_to_nir.h"
 #include "midgard/midgard_compile.h"
 #include "util/u_dynarray.h"
-#endif
 
 void
 panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *meta, const char *src, int type, struct panfrost_shader_state *state)
 {
 	uint8_t* dst;
 
-#ifdef HAVE_DRI3
 	/* When running inside Mesa, invoke the compiler do the whole compile shebang */
 	nir_shader *s;
 
@@ -117,24 +114,10 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	FILE *fp = fopen("/dev/shm/s.bin", "wb");
 	fwrite(dst, 1, last_shader_size, fp);
 	fclose(fp);
-#else
-	/* When running standalone, use precompiled or runtime assembly of shaders */
-	if (src) {
-		last_shader_size = 1024;
-		dst = malloc(last_shader_size);
-		pandev_shader_assemble((uint32_t *) dst, src, type);
-	} else {
-		dst = pandev_shader_compile(NULL, NULL, type);
-	}
-#endif
 
 	meta->shader = panfrost_upload(&ctx->shaders, dst, last_shader_size, true) | 5;
 
-#ifdef HAVE_DRI3
 	util_dynarray_fini(&compiled);
-#else
-	free(dst);
-#endif
 
     /* TODO: From compiler */
 
