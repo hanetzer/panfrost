@@ -182,13 +182,6 @@ normalised_float_to_u8(float f) {
 }
 
 static void
-panfrost_flush(
-		struct pipe_context *pipe,
-		struct pipe_fence_handle ** fence,
-		unsigned flags);
-
-
-static void
 panfrost_clear(
 		struct pipe_context *pipe,
 		unsigned buffers,
@@ -291,8 +284,6 @@ panfrost_clear(
 
 	fbd->clear_flags = clear_flags;
 #endif
-
-	panfrost_flush(pipe, NULL, 0);
 }
 
 static void
@@ -1315,7 +1306,6 @@ panfrost_flush(
 #ifndef DRY_RUN
 	/* Display the frame in our cute little window */
 	slowfb_update((uint8_t*) ctx->framebuffer.cpu, ctx->width, ctx->height);
-	printf("%x\n", ctx->depth_stencil_buffer.cpu[0]);
 #endif
 #endif
 }	
