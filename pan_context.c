@@ -701,6 +701,7 @@ trans_make_fixed_blend_mode(const struct pipe_rt_blend_state *blend, struct mali
 			return false;
 
 	out->rgb_mode = rgb_mode;
+	printf("Made %x\n", rgb_mode);
 	out->alpha_mode = alpha_mode;
 
 	/* Gallium and Mali represent colour masks identically. XXX: Static assert for future proof */
@@ -771,10 +772,8 @@ trans_default_shader_backend(struct panfrost_context *ctx)
 	if (default_stencil.enabled)
 		shader.unknown2_4 |= MALI_STENCIL_TEST;
 
-#if 0
 	if (!trans_make_fixed_blend_mode(&default_blend, &shader.blend_equation))
 		printf("ERROR: Default shader backend must not trigger blend shader\n");
-#endif
 
     memcpy(&ctx->fragment_shader_core, &shader, sizeof(shader));
 }
@@ -984,20 +983,14 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_shader_meta), true) >> 4;
 
 #ifdef T8XX
-		/* TODO: MERGE FOR WORKING BLENDING */
+		/* Additional blend descriptor tacked on for newer systems */
+		printf("BEEEEP %X\n", ctx->fragment_shader_core.blend_equation.rgb_mode);
+
 		struct mali_blend_meta blend_meta[] = {
 			{
 				.unk1 = 0x200,
-				.blend_equation_1 = {
-					.rgb_mode = 0x122,
-					.alpha_mode = 0x122,
-					.color_mask = MALI_MASK_R | MALI_MASK_G | MALI_MASK_B | MALI_MASK_A,
-				},
-				.blend_equation_2 = {
-					.rgb_mode = 0x122,
-					.alpha_mode = 0x122,
-					.color_mask = MALI_MASK_R | MALI_MASK_G | MALI_MASK_B | MALI_MASK_A,
-				},
+				.blend_equation_1 = ctx->fragment_shader_core.blend_equation,
+				.blend_equation_2 = ctx->fragment_shader_core.blend_equation
 			},
 		};
 
@@ -2002,7 +1995,6 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 
 	SET_BIT(ctx->fragment_shader_core.unknown2_4, MALI_NO_DITHER, !blend->dither);
 
-#if 0
 	/* Assume one color buffer atm TODO */
 	/* TODO: Move to CSO create for perf improvement */
 	if (!trans_make_fixed_blend_mode(&blend->rt[0], &ctx->fragment_shader_core.blend_equation)) {
@@ -2012,10 +2004,10 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 			printf("ERROR: Default shader backend must not trigger blend shader\n");
 		//assert(0);
 	}
-#endif
 
 	/* Shader itself is not dirty, but the shader core is */
 	ctx->dirty |= PAN_DIRTY_FS;
+	printf("Blend core dirty\n");
 }
 
 static void
