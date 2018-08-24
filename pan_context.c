@@ -145,18 +145,20 @@ trans_emit_fbd(struct panfrost_context *ctx)
 static void
 trans_new_frag_framebuffer(struct panfrost_context *ctx)
 {
+	uint8_t *framebuffer = ctx->framebuffer.gpu;
+	int stride = ctx->stride;
+
+	/* The default is upside down from OpenGL's perspective */
+	if (ctx->flip_vertical) {
+		framebuffer += ctx->stride * (ctx->height - 1);
+		stride = -stride;
+	}
+
 #ifdef SFBD
         struct mali_single_framebuffer fb = trans_emit_fbd(ctx);
 
-        fb.framebuffer = ctx->framebuffer.gpu;
-	fb.stride = ctx->stride;
-
-	/* The default is upside down from OpenGL's perspective */
-
-	if (ctx->flip_vertical) {
-		fb.framebuffer += ctx->framebuffer.size;
-		fb.stride = -fb.stride;
-	}
+        fb.framebuffer = framebuffer;
+	fb.stride = stride;
 
         fb.format = 0xb84e0281; /* RGB32, no MSAA */
 #else
@@ -170,8 +172,8 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 		.unk1 = 0x4000000,
 		//.format = 0x880a8899, /* RGB32, no MSAA */
 		.format = 0x860a8899, /* RGBA32, no MSAA */
-		.framebuffer = ctx->framebuffer.gpu,
-		.framebuffer_stride = ctx->width / 4,
+		.framebuffer = framebuffer,
+		.framebuffer_stride = (stride / 16) & 0xfffffff,
 	};
 
 	memcpy(&ctx->fragment_rts[0], &rt, sizeof(rt));
