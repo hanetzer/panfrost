@@ -30,6 +30,12 @@
 #include "pan_screen.h"
 #endif
 
+static void
+panfrost_flush(
+		struct pipe_context *pipe,
+		struct pipe_fence_handle ** fence,
+		unsigned flags);
+
 /* Don't use the mesa winsys; use our own X11 window with Xshm */
 #define USE_SLOWFB
 
@@ -1221,7 +1227,7 @@ force_flush_fragment(struct panfrost_context *ctx)
 /* The entire frame is in memory -- send it off to the kernel! */
 
 static void
-trans_submit_frame(struct panfrost_context *ctx)
+trans_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 {
 	/* Edge case if screen is cleared and nothing else */
 	bool has_draws = ctx->draw_count > 0;
@@ -1232,8 +1238,10 @@ trans_submit_frame(struct panfrost_context *ctx)
 	ctx->draw_count = 0;
 
 #ifndef DRY_RUN
-	/* XXX: FLUSH SHOULD HAPPEN HERE */
-	//force_flush_fragment(ctx);
+	/* If visual, we can stall a frame */
+
+	if (!flush_immediate)
+		force_flush_fragment(ctx);
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1280,8 +1288,9 @@ trans_submit_frame(struct panfrost_context *ctx)
 
 	last_fragment_id = atoms[1].atom_number;
 
-	/* XXX XXX XXX THIS KILLS PERF */
-	force_flush_fragment(ctx);
+	/* If readback, flush now (hurts the pipelined performance) */
+	if (flush_immediate)
+		force_flush_fragment(ctx);
 #endif
 }
 
@@ -1297,7 +1306,7 @@ panfrost_flush(
 	if (!ctx->draw_count && !(ctx->dirty & PAN_DIRTY_DUMMY)) return;
 
 	/* Submit the frame itself */
-	trans_submit_frame(ctx);
+	trans_submit_frame(ctx, flags & PIPE_FLUSH_END_OF_FRAME);
 
 	/* Prepare for the next frame */
 	trans_invalidate_frame(ctx);
@@ -1938,7 +1947,9 @@ panfrost_transfer_map(struct pipe_context *pctx,
 
 		/* Set the CPU mapping to that of the framebuffer in memory, untiled */
 		rsrc->cpu[level] = ctx->framebuffer.cpu;
-		printf("Display target so %p\n", ctx->framebuffer.cpu);
+
+		/* Force a flush -- kill the pipeline */
+		panfrost_flush(pctx, NULL, PIPE_FLUSH_END_OF_FRAME);
 	} else if (resource->bind & PIPE_BIND_DEPTH_STENCIL) {
 		/* Mipmapped readpixels?! */
 		assert(level == 0);
