@@ -48,7 +48,7 @@ panfrost_flush(
 
 /* MSAA is not supported in sw_winsys but it does make for nicer demos ;) so we
  * can force it regardless of gallium saying we don't have it */
-static bool FORCE_MSAA = false;
+static bool FORCE_MSAA = true;
 
 /* Descriptor is generated along with the shader compiler */
 
@@ -72,10 +72,12 @@ trans_set_framebuffer_msaa(struct panfrost_context *ctx, bool enabled)
 #ifdef SFBD
 	SET_BIT(ctx->fragment_fbd.format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
 #else
-	/*
-	SET_BIT(ctx->fragment_rts[0].format, MALI_FRAMEBUFFER_MSAA_A | MALI_FRAMEBUFFER_MSAA_B, enabled);
-	*/
-	printf("TODO: MSAA\n");
+	SET_BIT(ctx->fragment_rts[0].format, 0x1000, enabled);
+	
+	SET_BIT(ctx->fragment_fbd.unk1, 0x12, enabled);
+
+	/* WTF */
+	ctx->fragment_fbd.rt_count_2 = enabled ? 4 : 1;
 #endif
 }
 
