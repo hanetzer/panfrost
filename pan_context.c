@@ -916,6 +916,12 @@ trans_emit_vertex_data(struct panfrost_context *ctx)
 		attrs[i].stride = buf->stride;
 		attrs[i].size = buf->stride * (ctx->payload_vertex.draw_start + ctx->vertex_count);
 		attrs[i].elements = panfrost_upload(&ctx->cmdstream, rsrc->cpu[0] + buf->buffer_offset, attrs[i].size, false) | 1;
+
+		float *a = (rsrc->cpu[0] + buf->buffer_offset);
+		for (int j = 0; j < attrs[i].size/4; ++j) {
+			printf("%f ", a[j]);
+		}
+		printf("\n");
 	}
 
 	for (int i = 0; i < ctx->varying_count; ++i) {
