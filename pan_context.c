@@ -2412,7 +2412,7 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	ctx->width = width;
 	ctx->height = height;
 	ctx->bytes_per_pixel = 4; /* RGB32 */
-	ctx->has_alpha_channel = false;
+	ctx->has_alpha_channel = true;
 	ctx->flip_vertical = true; /* OpenGL */
 
 	/* drisw rounds the stride */
