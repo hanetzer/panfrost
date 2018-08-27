@@ -1445,6 +1445,11 @@ panfrost_set_scissor(struct panfrost_context *ctx)
 {
 	const struct pipe_scissor_state *ss = &ctx->scissors[0];
 
+	if (!ss) {
+		/* XXX: How to handle? */
+		return;
+	}
+
 	if (ctx->rasterizer->base.scissor) {
 		ctx->viewport.viewport0[0] = ss->minx;
 		ctx->viewport.viewport0[1] = ss->miny;
