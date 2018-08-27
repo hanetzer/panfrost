@@ -165,6 +165,7 @@ trans_new_frag_framebuffer(struct panfrost_context *ctx)
 	if (ctx->flip_vertical) {
 		framebuffer += ctx->stride * (ctx->height - 1);
 		stride = -stride;
+		printf("Framebuffer start %llx\n", framebuffer);
 	}
 
 #ifdef SFBD
@@ -1262,7 +1263,7 @@ trans_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 			.nr_ext_res = 1,
 			.ext_res_list = framebuffer,
 			.atom_number = allocate_atom(),
-			.compat_core_req = MALI_JD_REQ_FS /*| MALI_JD_REQ_EXTERNAL_RESOURCES | MALI_JD_REQ_SKIP_CACHE_START*/
+			.compat_core_req = MALI_JD_REQ_FS | MALI_JD_REQ_EXTERNAL_RESOURCES | MALI_JD_REQ_SKIP_CACHE_START
 		},
 	};
 
@@ -2430,20 +2431,22 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	struct mali_ioctl_mem_import framebuffer_import = {
 		.phandle = (uint64_t) (uintptr_t) &framebuffer_handle,
 		.type = MALI_MEM_IMPORT_TYPE_USER_BUFFER,
-		.flags = MALI_MEM_PROT_CPU_RD | MALI_MEM_PROT_CPU_WR | MALI_MEM_PROT_GPU_RD | MALI_MEM_PROT_GPU_WR,
+		.flags = MALI_MEM_PROT_CPU_RD | MALI_MEM_PROT_CPU_WR | MALI_MEM_PROT_GPU_RD | MALI_MEM_PROT_GPU_WR | MALI_MEM_IMPORT_SHARED,
 	};
 
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
 
 	printf("(%llx)\n", framebuffer_import.gpu_va);
-	exit(0);
+	
+	uint64_t gpu_addr = mmap(NULL, framebuffer_import.va_pages * 4096, 3, 1, ctx->fd, framebuffer_import.gpu_va);
 
 	/* TODO: Reenable imports when we understand the new kernel API */
 
-	trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
+	//trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
 
-	ctx->framebuffer.gpu = framebuffer_import.gpu_va;
+	ctx->framebuffer.gpu = gpu_addr;
 	ctx->framebuffer.size = ctx->stride * ctx->height;
+	printf("Framebuffer: %llx - %llx (vs %llx)\n", gpu_addr, gpu_addr + framebuffer_sz, addr);
 }
 
 static void
