@@ -313,7 +313,7 @@ trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 	mali_ptr who_knows = panfrost_reserve(&ctx->cmdstream, 1024);
 #endif
 
-	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(ctx->vt_framebuffer), false) | PANFROST_DEFAULT_FBD;
+	mali_ptr framebuffer_1_p = panfrost_upload(&ctx->cmdstream, &ctx->vt_framebuffer, sizeof(ctx->vt_framebuffer), true) | PANFROST_DEFAULT_FBD;
 
 #ifdef MFBD
 	/* MFBD needs a sequential semi-render target upload */
