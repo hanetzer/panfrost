@@ -2414,24 +2414,18 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 
 	size_t framebuffer_sz = ctx->stride * ctx->height;
 
-	/* Unclear why framebuffers are offset like this */
-	int offset = (ctx->stride - 256) * ctx->bytes_per_pixel;
-
-#if 0
 	if (addr) {
 		ctx->framebuffer.cpu = (uint8_t *) addr;
 	} else {
-		posix_memalign((void **) &ctx->framebuffer.cpu, CACHE_LINE_SIZE, framebuffer_sz + offset);
-		struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu + offset), rw, ctx->height);
+		posix_memalign((void **) &ctx->framebuffer.cpu, CACHE_LINE_SIZE, framebuffer_sz);
+		struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
 
 		/* May not be the same as our original alloc if we're using XShm, etc */
 		ctx->framebuffer.cpu = info.framebuffer;
 		ctx->stride = info.stride;
 	}
-#endif
 
-#if 0
-	struct mali_mem_import_user_buffer framebuffer_handle = { .ptr = (uint64_t) (uintptr_t) ctx->framebuffer.cpu, .length = framebuffer_sz + offset };
+	struct mali_mem_import_user_buffer framebuffer_handle = { .ptr = (uint64_t) (uintptr_t) ctx->framebuffer.cpu, .length = framebuffer_sz };
 
 	struct mali_ioctl_mem_import framebuffer_import = {
 		.phandle = (uint64_t) (uintptr_t) &framebuffer_handle,
@@ -2440,16 +2434,16 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 	};
 
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
-#endif
+
+	printf("(%llx)\n", framebuffer_import.gpu_va);
+	exit(0);
+
 	/* TODO: Reenable imports when we understand the new kernel API */
 
 	trans_allocate_slab(ctx, &ctx->framebuffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
-	trans_allocate_slab(ctx, &ctx->depth_stencil_buffer, 2*(ctx->stride * ctx->height) / 4096, true, true, 0, 0, 0);
-	struct slowfb_info info = slowfb_init((uint8_t*) (ctx->framebuffer.cpu), rw, ctx->height);
-	ctx->stride = info.stride;
 
-	//ctx->framebuffer.gpu = framebuffer_import.gpu_va;
-	//ctx->framebuffer.size = ctx->stride * ctx->height;
+	ctx->framebuffer.gpu = framebuffer_import.gpu_va;
+	ctx->framebuffer.size = ctx->stride * ctx->height;
 }
 
 static void
