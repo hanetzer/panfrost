@@ -75,6 +75,8 @@ pandev_shader_compile(uint32_t *dst, const char *src, int type)
 #include "midgard/midgard_compile.h"
 #include "util/u_dynarray.h"
 
+#include "tgsi/tgsi_dump.h"
+
 void
 panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *meta, const char *src, int type, struct panfrost_shader_state *state)
 {
@@ -91,7 +93,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	} else {
 		printf("TGSI in\n");
 		assert (cso->type == PIPE_SHADER_IR_TGSI);
-
+		tgsi_dump(cso->tokens, 0);
 		s = tgsi_to_nir(cso->tokens, &midgard_nir_options);
 	}
 

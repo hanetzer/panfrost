@@ -2187,10 +2187,12 @@ panfrost_set_scissor_states(struct pipe_context *pipe,
 
 	ctx->scissors = scissors;
 
+#if 0
 	/* TODO */
         trans_viewport(ctx, 0.0, 1.0, ss->minx, ss->miny, ss->maxx, ss->maxy);
 	ctx->dirty |= PAN_DIRTY_VIEWPORT;
 	/* TODO */
+#endif
 }
 
 static void
