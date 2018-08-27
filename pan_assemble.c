@@ -93,7 +93,6 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	} else {
 		printf("TGSI in\n");
 		assert (cso->type == PIPE_SHADER_IR_TGSI);
-		tgsi_dump(cso->tokens, 0);
 		s = tgsi_to_nir(cso->tokens, &midgard_nir_options);
 	}
 

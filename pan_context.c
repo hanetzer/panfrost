@@ -25,6 +25,7 @@
 #include "util/u_transfer.h"
 #include "util/u_transfer_helper.h"
 #include "indices/u_primconvert.h"
+#include "tgsi/tgsi_parse.h"
 
 #include "pan_screen.h"
 
@@ -1561,6 +1562,10 @@ panfrost_create_shader_state(
 {
 	struct panfrost_shader_state *so = CALLOC_STRUCT(panfrost_shader_state);
 	so->base = *cso;
+	
+	/* Token deep copy to prevent memory corruption*/
+	so->base.tokens = tgsi_dup_tokens(so->base.tokens);
+
 	return so;
 }
 
