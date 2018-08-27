@@ -1440,6 +1440,27 @@ panfrost_generic_cso_delete(struct pipe_context *pctx, void *hwcso)
 	free(hwcso);
 }
 
+static void
+panfrost_set_scissor(struct panfrost_context *ctx)
+{
+	const struct pipe_scissor_state *ss = &ctx->scissors[0];
+
+	if (ctx->rasterizer->base.scissor) {
+		ctx->viewport.viewport0[0] = ss->minx;
+		ctx->viewport.viewport0[1] = ss->miny;
+		ctx->viewport.viewport1[0] = MALI_POSITIVE(ss->maxx);
+		ctx->viewport.viewport1[1] = MALI_POSITIVE(ss->maxy);
+	} else {
+		ctx->viewport.viewport0[0] = 0;
+		ctx->viewport.viewport0[1] = 0;
+		ctx->viewport.viewport1[0] = MALI_POSITIVE(ctx->width);
+		ctx->viewport.viewport1[1] = MALI_POSITIVE(ctx->height);
+
+	}
+
+	ctx->dirty |= PAN_DIRTY_VIEWPORT;
+}
+
 static void*
 panfrost_create_rasterizer_state(
 		struct pipe_context *pctx,
@@ -1475,8 +1496,22 @@ panfrost_bind_rasterizer_state(
 		void *hwcso)
 {
 	struct panfrost_context *ctx = panfrost_context(pctx);
+	struct pipe_rasterizer_state *cso = hwcso;
+
+	if (!hwcso) {
+		/* XXX: How to unbind rasterizer state? */
+		return;
+	}
+
+	/* If scissor test has changed, we'll need to update that now */
+	bool update_scissor = !ctx->rasterizer || ctx->rasterizer->base.scissor != cso->scissor;
 
 	ctx->rasterizer = hwcso;
+
+	/* Actualise late changes */
+	if (update_scissor)
+		panfrost_set_scissor(ctx);
+
 	ctx->dirty |= PAN_DIRTY_RASTERIZER;
 }
 
@@ -2187,17 +2222,9 @@ panfrost_set_scissor_states(struct pipe_context *pipe,
 	assert(start_slot == 0);
 	assert(num_scissors == 1);
 
-	const struct pipe_scissor_state *ss = &scissors[0];
-	printf("(%d, %d) -> (%d, %d)\n", ss->minx, ss->miny, ss->maxx, ss->maxy);
-
 	ctx->scissors = scissors;
 
-	ctx->viewport.viewport0[0] = ss->minx;
-	ctx->viewport.viewport0[1] = ss->miny;
-	ctx->viewport.viewport1[0] = MALI_POSITIVE(ss->maxx);
-	ctx->viewport.viewport1[1] = MALI_POSITIVE(ss->maxy);
-
-	ctx->dirty |= PAN_DIRTY_VIEWPORT;
+	panfrost_set_scissor(ctx);
 }
 
 static void
