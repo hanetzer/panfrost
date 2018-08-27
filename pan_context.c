@@ -1250,10 +1250,13 @@ trans_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	ctx->draw_count = 0;
 
 #ifndef DRY_RUN
+	/* XXX: flush_immediate was causing lock-ups wrt readpixels in dEQP. Investigate. */
+#if 0
 	/* If visual, we can stall a frame */
 
 	if (!flush_immediate)
 		force_flush_fragment(ctx);
+#endif
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1301,7 +1304,7 @@ trans_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	last_fragment_id = atoms[1].atom_number;
 
 	/* If readback, flush now (hurts the pipelined performance) */
-	if (flush_immediate)
+	//if (flush_immediate)
 		force_flush_fragment(ctx);
 #endif
 }
