@@ -399,23 +399,6 @@ trans_viewport(struct panfrost_context *ctx,
 	memcpy(&ctx->viewport, &ret, sizeof(ret));
 }
 
-/* Shared descriptor for attributes as well as varyings, which can be
- * considered like a matrix. This function is just a simplified constructor; no
- * actual bookkeeping is done (hence the lack of a context parameter). */
-
-struct mali_attr
-trans_attr(size_t type_sz, int columns, int vertices)
-{
-	int stride = type_sz * columns;
-
-	struct mali_attr ret = {
-		.stride = stride,
-		.size = stride * vertices
-	};
-
-	return ret;
-}
-
 /* In practice, every field of these payloads should be configurable
  * arbitrarily, which means these functions are basically catch-all's for
  * as-of-yet unwavering unknowns */
@@ -1553,8 +1536,10 @@ panfrost_create_vertex_elements_state(
 					type = MALI_ATYPE_SHORT;
 				else if (chan.size == 32)
 					type = MALI_ATYPE_INT;
-				else
+				else {
 					printf("BAD INT SIZE %d\n", chan.size);
+					assert(0);
+				}
 
 				break;
 
@@ -1564,11 +1549,12 @@ panfrost_create_vertex_elements_state(
 
 			default:
 				printf("Unknown atype %d\n", chan.type);
+				assert(0);
 		}
 
 		so->hw[i].type = type;
 		so->nr_components[i] = desc->nr_channels;
-		so->hw[i].nr_components = MALI_POSITIVE(4); /* XXX */
+		so->hw[i].nr_components = MALI_POSITIVE(desc->nr_channels); /* XXX */
                 so->hw[i].not_normalised = !chan.normalized;
 
 		/* Bit used for both signed/unsigned and full/half designation */
