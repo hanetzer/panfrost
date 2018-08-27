@@ -1561,7 +1561,7 @@ panfrost_create_vertex_elements_state(
 
 		so->hw[i].type = type;
 		so->nr_components[i] = desc->nr_channels;
-		so->hw[i].nr_components = MALI_POSITIVE(desc->nr_channels); /* XXX */
+		so->hw[i].nr_components = MALI_POSITIVE(4); /* XXX: Why is this needed? */
                 so->hw[i].not_normalised = !chan.normalized;
 
 		/* Bit used for both signed/unsigned and full/half designation */
