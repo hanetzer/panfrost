@@ -679,12 +679,12 @@ static const struct pipe_rt_blend_state default_blend = {
 };
 
 static bool
-trans_make_fixed_blend_mode(const struct pipe_rt_blend_state *blend, struct mali_blend_equation *out)
+trans_make_fixed_blend_mode(const struct pipe_rt_blend_state *blend, struct mali_blend_equation *out, unsigned colormask)
 {
 	/* If no blending is enabled, default back on `replace` mode */
 
 	if (!blend->blend_enable)
-		return trans_make_fixed_blend_mode(&default_blend, out);
+		return trans_make_fixed_blend_mode(&default_blend, out, colormask);
 
 	unsigned rgb_mode = 0;
 	unsigned alpha_mode = 0;
@@ -704,7 +704,7 @@ trans_make_fixed_blend_mode(const struct pipe_rt_blend_state *blend, struct mali
 	out->alpha_mode = alpha_mode;
 
 	/* Gallium and Mali represent colour masks identically. XXX: Static assert for future proof */
-	out->color_mask = blend->colormask;
+	out->color_mask = colormask;
 
 	return true;
 }
@@ -771,7 +771,7 @@ trans_default_shader_backend(struct panfrost_context *ctx)
 	if (default_stencil.enabled)
 		shader.unknown2_4 |= MALI_STENCIL_TEST;
 
-	if (!trans_make_fixed_blend_mode(&default_blend, &shader.blend_equation))
+	if (!trans_make_fixed_blend_mode(&default_blend, &shader.blend_equation, default_blend.colormask))
 		printf("ERROR: Default shader backend must not trigger blend shader\n");
 
     memcpy(&ctx->fragment_shader_core, &shader, sizeof(shader));
@@ -2057,10 +2057,10 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 
 	/* Assume one color buffer atm TODO */
 	/* TODO: Move to CSO create for perf improvement */
-	if (!trans_make_fixed_blend_mode(&blend->rt[0], &ctx->fragment_shader_core.blend_equation)) {
+	if (!trans_make_fixed_blend_mode(&blend->rt[0], &ctx->fragment_shader_core.blend_equation, blend->rt[0].colormask)) {
 		printf("ERROR: Blend shaders not yet implemented\n");
 		/* TODO: Handle */
-		if (!trans_make_fixed_blend_mode(&default_blend, &ctx->fragment_shader_core.blend_equation))
+		if (!trans_make_fixed_blend_mode(&default_blend, &ctx->fragment_shader_core.blend_equation, blend->rt[0].colormask))
 			printf("ERROR: Default shader backend must not trigger blend shader\n");
 		//assert(0);
 	}
