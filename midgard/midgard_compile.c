@@ -1803,7 +1803,7 @@ actualise_register_to_ssa(compiler_context *ctx)
  * */
 
 static void
-write_transformed_position(nir_builder *b, nir_src input_point_src)
+write_transformed_position(nir_builder *b, nir_src input_point_src, int uniform_no)
 {
 	nir_ssa_def *input_point = nir_ssa_for_src(b, input_point_src, 4);
 
@@ -1811,7 +1811,7 @@ write_transformed_position(nir_builder *b, nir_src input_point_src)
 	nir_intrinsic_instr *load;
 	load = nir_intrinsic_instr_create(b->shader, nir_intrinsic_load_uniform);
 	load->num_components = 4;
-	load->src[0] = nir_src_for_ssa(nir_imm_int(b, 0));
+	load->src[0] = nir_src_for_ssa(nir_imm_int(b, uniform_no));
 	nir_ssa_dest_init(&load->instr, &load->dest, 4, 32, NULL);
 	nir_builder_instr_insert(b, &load->instr);
 	
@@ -1907,7 +1907,7 @@ transform_position_writes(nir_shader *shader)
 				nir_builder_init(&b, func->impl);
 				b.cursor = nir_before_instr(instr);
 
-				write_transformed_position(&b, intr->src[0]);
+				write_transformed_position(&b, intr->src[0], shader->num_uniforms - 1);
 				nir_instr_remove(instr);
 			}
 		}
@@ -1933,6 +1933,14 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	};
 
 	compiler_context *ctx = &ictx;
+
+        /* Prepend epilogue uniforms if necessary */
+        nir_variable *viewport_uniform = NULL;
+ 
+        if (ctx->stage == MESA_SHADER_VERTEX) {
+                viewport_uniform = nir_variable_create(nir, nir_var_uniform, glsl_vec4_type(), "viewport");
+        }
+
 
 	/* Assign var locations early, so the epilogue can use them if necessary */
 

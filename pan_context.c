@@ -1104,24 +1104,26 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		struct panfrost_constant_buffer *buf = &ctx->constant_buffer[i];
 
 		if (buf->dirty) {
-			mali_ptr address_prefix, address_main;
+			mali_ptr address;
 
-			/* Attach vertex prefix */
-			if (i == PIPE_SHADER_VERTEX)
-				address_prefix = panfrost_upload(&ctx->cmdstream, viewport_vec4, sizeof(viewport_vec4), true);
-			
+			bool has_suffix = (i == PIPE_SHADER_VERTEX);
+		
 			if (buf->size)
-				address_main = panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, false);
+				address = panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, true);
 			else
-				address_main = panfrost_reserve(&ctx->cmdstream, 256);
+				address = panfrost_reserve(&ctx->cmdstream, has_suffix ? 0 : 255);
+
+			/* Attach vertex postfix */
+			if (i == PIPE_SHADER_VERTEX)
+				panfrost_upload_sequential(&ctx->cmdstream, viewport_vec4, sizeof(viewport_vec4));
 			
 			switch (i) {
 				case PIPE_SHADER_VERTEX:
-					ctx->payload_vertex.postfix.uniforms = address_prefix;
+					ctx->payload_vertex.postfix.uniforms = address;
 					break;
 
 				case PIPE_SHADER_FRAGMENT:
-					ctx->payload_tiler.postfix.uniforms = address_main;
+					ctx->payload_tiler.postfix.uniforms = address;
 					break;
 
 				default:
