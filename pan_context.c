@@ -1092,12 +1092,14 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 	}
 
 	/* Generate the viewport vector of the form: <width, height, centerx, centery> */
-	float viewport_vec4[] = {
-		ctx->width,
-		ctx->height,
+	const struct pipe_viewport_state *vp = &ctx->viewports[0];
 
-		(float) (ctx->width) / 2.0,
-		(float) (ctx->height) / 2.0,
+	float viewport_vec4[] = {
+		2.0 * vp->scale[0],
+		-2.0 * vp->scale[1],
+
+		vp->translate[0],
+		/* -1.0 * vp->translate[1] */ -1.0 * vp->scale[1] /* XXX */
 	};
 
 	for (int i = 0; i < PIPE_SHADER_TYPES; ++i) {
