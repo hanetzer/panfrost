@@ -1807,14 +1807,21 @@ write_transformed_position(nir_builder *b, nir_src input_point_src)
 {
 	nir_ssa_def *input_point = nir_ssa_for_src(b, input_point_src, 4);
 
-	/* XXX: From uniforms? */
+	/* Get viewport from the uniforms */
+	nir_intrinsic_instr *load;
+	load = nir_intrinsic_instr_create(b->shader, nir_intrinsic_load_uniform);
+	load->num_components = 4;
+	load->src[0] = nir_src_for_ssa(nir_imm_int(b, 0));
+	nir_ssa_dest_init(&load->instr, &load->dest, 4, 32, NULL);
+	nir_builder_instr_insert(b, &load->instr);
+	
+	/* Formatted as <width, height, centerx, centery> */
+	nir_ssa_def *viewport_vec4 = &load->dest.ssa;
+	nir_ssa_def *viewport_width = nir_channel(b, viewport_vec4, 0);
+	nir_ssa_def *viewport_height = nir_channel(b, viewport_vec4, 1);
+	nir_ssa_def *viewport_offset = nir_channels(b, viewport_vec4, 0x8 | 0x4);
 
-	float w = 2048.0f;
-	float h = 1280.0f;
-	nir_ssa_def *viewport_width = nir_imm_float(b, w);
-	nir_ssa_def *viewport_height = nir_imm_float(b, h);
-	nir_ssa_def *viewport_center_x = nir_imm_float(b, w / 2.0f);
-	nir_ssa_def *viewport_center_y = nir_imm_float(b, h / 2.0f);
+	/* XXX: From uniforms? */
 	nir_ssa_def *depth_near = nir_imm_float(b, 0.0);
 	nir_ssa_def *depth_far = nir_imm_float(b, 1.0);
 
@@ -1828,10 +1835,6 @@ write_transformed_position(nir_builder *b, nir_src input_point_src)
 	nir_ssa_def *viewport_multiplier = nir_vec2(b,
 			nir_fmul(b, viewport_width, nir_imm_float(b, 0.5f)),
 			nir_fmul(b, viewport_height, nir_imm_float(b, 0.5f)));
-
-	nir_ssa_def *viewport_offset = nir_vec2(b, 
-			viewport_center_x,
-			viewport_center_y);
 
 	nir_ssa_def *viewport_xy = nir_fadd(b, nir_fmul(b, nir_channels(b, ndc_point, 0x3), viewport_multiplier), viewport_offset);
 

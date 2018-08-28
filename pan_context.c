@@ -1091,24 +1091,37 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 		}
 	}
 
+	/* Generate the viewport vector of the form: <width, height, centerx, centery> */
+	float viewport_vec4[] = {
+		ctx->width,
+		ctx->height,
+
+		(float) (ctx->width) / 2.0,
+		(float) (ctx->height) / 2.0,
+	};
+
 	for (int i = 0; i < PIPE_SHADER_TYPES; ++i) {
 		struct panfrost_constant_buffer *buf = &ctx->constant_buffer[i];
 
 		if (buf->dirty) {
-			mali_ptr address;
+			mali_ptr address_prefix, address_main;
+
+			/* Attach vertex prefix */
+			if (i == PIPE_SHADER_VERTEX)
+				address_prefix = panfrost_upload(&ctx->cmdstream, viewport_vec4, sizeof(viewport_vec4), true);
 			
 			if (buf->size)
-				address = panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, false);
+				address_main = panfrost_upload(&ctx->cmdstream, buf->buffer, buf->size, false);
 			else
-				address = panfrost_reserve(&ctx->cmdstream, 256);
+				address_main = panfrost_reserve(&ctx->cmdstream, 256);
 			
 			switch (i) {
 				case PIPE_SHADER_VERTEX:
-					ctx->payload_vertex.postfix.uniforms = address;
+					ctx->payload_vertex.postfix.uniforms = address_prefix;
 					break;
 
 				case PIPE_SHADER_FRAGMENT:
-					ctx->payload_tiler.postfix.uniforms = address;
+					ctx->payload_tiler.postfix.uniforms = address_main;
 					break;
 
 				default:
