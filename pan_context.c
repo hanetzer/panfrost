@@ -24,6 +24,7 @@
 #include "util/u_upload_mgr.h"
 #include "util/u_transfer.h"
 #include "util/u_transfer_helper.h"
+#include "util/u_memory.h"
 #include "indices/u_primconvert.h"
 #include "tgsi/tgsi_parse.h"
 
@@ -2034,8 +2035,6 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
    ctx->pipe_framebuffer.samples = fb->samples;
    ctx->pipe_framebuffer.layers = fb->layers;
 }
-
-#define mem_dup(mem, sz) (memcpy(malloc(sz), mem, sz))
 
 static void *
 panfrost_create_blend_state(struct pipe_context *pipe,

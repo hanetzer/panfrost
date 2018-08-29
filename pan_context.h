@@ -274,10 +274,6 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags);
 void
 trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int w, int h);
 
-#ifndef CALLOC_STRUCT
-#define CALLOC_STRUCT(s) calloc(sizeof(struct s), 1)
-#endif
-
 struct pipe_resource *
 panfrost_resource_create_front(struct pipe_screen *screen,
 			       const struct pipe_resource *template,
