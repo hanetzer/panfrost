@@ -249,30 +249,8 @@ panfrost_context(struct pipe_context *pcontext)
 	return (struct panfrost_context *) pcontext;
 }
 
-void
-trans_default_shader_backend(struct panfrost_context *ctx);
-
-void
-trans_viewport(struct panfrost_context *ctx,
-		float depth_range_n, float depth_range_f,
-		int viewport_x0, int viewport_y0,
-		int viewport_x1, int viewport_y1);
-
-void
-trans_rasterizer_state(struct midgard_payload_vertex_tiler *vt,
-		float line_width,
-		int front_face);
-
-struct mali_attr trans_attr(size_t type_sz, int columns, int vertices);
-
-void
-trans_queue_draw(struct panfrost_context *ctx);
-
 struct pipe_context *
 panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags);
-
-void
-trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int w, int h);
 
 struct pipe_resource *
 panfrost_resource_create_front(struct pipe_screen *screen,

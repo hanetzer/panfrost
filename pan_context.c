@@ -339,6 +339,31 @@ trans_attach_vt_framebuffer(struct panfrost_context *ctx)
 	ctx->payload_tiler.postfix.framebuffer = framebuffer_1_p;
 }
 
+static void
+trans_viewport(struct panfrost_context *ctx,
+		float depth_range_n,
+		float depth_range_f,
+		int viewport_x0, int viewport_y0,
+		int viewport_x1, int viewport_y1)
+{
+	/* Viewport encoding is asymmetric. Purpose of the floats is unknown? */
+
+	struct mali_viewport ret = {
+		.floats = {
+			-inff, -inff,
+			inff, inff,
+		},
+
+		.depth_range_n = depth_range_n, 
+		.depth_range_f = depth_range_f,
+
+		.viewport0 = { viewport_x0, viewport_y0 },
+		.viewport1 = { MALI_POSITIVE(viewport_x1), MALI_POSITIVE(viewport_y1) },
+	};
+
+	memcpy(&ctx->viewport, &ret, sizeof(ret));
+}
+
 /* Reset per-frame context, called on context initialisation as well as after
  * flushing a frame */
 
@@ -375,31 +400,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 
 	/* XXX */
 	ctx->dirty |= PAN_DIRTY_SAMPLERS | PAN_DIRTY_TEXTURES;
-}
-
-void
-trans_viewport(struct panfrost_context *ctx,
-		float depth_range_n,
-		float depth_range_f,
-		int viewport_x0, int viewport_y0,
-		int viewport_x1, int viewport_y1)
-{
-	/* Viewport encoding is asymmetric. Purpose of the floats is unknown? */
-
-	struct mali_viewport ret = {
-		.floats = {
-			-inff, -inff,
-			inff, inff,
-		},
-
-		.depth_range_n = depth_range_n, 
-		.depth_range_f = depth_range_f,
-
-		.viewport0 = { viewport_x0, viewport_y0 },
-		.viewport1 = { MALI_POSITIVE(viewport_x1), MALI_POSITIVE(viewport_y1) },
-	};
-
-	memcpy(&ctx->viewport, &ret, sizeof(ret));
 }
 
 /* In practice, every field of these payloads should be configurable
@@ -741,7 +741,7 @@ trans_make_stencil_state(const struct pipe_stencil_state *in, struct mali_stenci
 	out->dppass = trans_translate_stencil_op(in->zpass_op);
 }
 
-void
+static void
 trans_default_shader_backend(struct panfrost_context *ctx)
 {
 	struct mali_shader_meta shader = {
@@ -1148,7 +1148,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 
 /* Corresponds to exactly one draw, but does not submit anything */
 
-void
+static void
 trans_queue_draw(struct panfrost_context *ctx)
 {
 	/* TODO: Expand the array? */
@@ -2398,7 +2398,7 @@ trans_allocate_slab(struct panfrost_context *ctx,
  * interface) or from an existing pointer (for shared memory, from the winsys)
  * */
 
-void
+static void
 trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width, int height)
 {
 	ctx->width = width;
