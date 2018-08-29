@@ -1795,8 +1795,6 @@ panfrost_set_stencil_ref(
 {
 	struct panfrost_context *ctx = panfrost_context(pctx);
 
-	ctx->stencil_ref = ref;
-
 	ctx->fragment_shader_core.stencil_front.ref = ref->ref_value[0];
 	ctx->fragment_shader_core.stencil_back.ref = ref->ref_value[1];
 
@@ -2025,9 +2023,7 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
          /* assign new */
          pipe_surface_reference(&ctx->pipe_framebuffer.cbufs[i], cb);
 	 
-	 struct panfrost_screen* scr = (struct panfrost_screen *) pctx->screen;
-	 struct pipe_surface *surf = ctx->pipe_framebuffer.cbufs[i];
-	 /* TODO: Do something with surf */
+	 /* TODO: Do something */
       }
    }
 
