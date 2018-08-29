@@ -500,8 +500,6 @@ panfrost_is_format_supported( struct pipe_screen *screen,
 static void
 panfrost_destroy_screen( struct pipe_screen *screen )
 {
-   struct panfrost_screen *pan_screen = panfrost_screen(screen);
-
    FREE(screen);
 }
 
@@ -514,8 +512,7 @@ panfrost_flush_frontbuffer(struct pipe_screen *_screen,
                            void *context_private,
                            struct pipe_box *sub_box)
 {
-   struct panfrost_screen *screen = panfrost_screen(_screen);
-   struct panfrost_resource *texture = (struct panfrost_resource *) resource;
+	/* TODO: Display target integration */
 }
 
 static uint64_t
@@ -554,12 +551,9 @@ struct pipe_screen *
 panfrost_create_screen(int fd, struct renderonly *ro)
 {
    struct panfrost_screen *screen = CALLOC_STRUCT(panfrost_screen);
-   printf("Size pan: %d\n", sizeof(*screen));
 
    if (!screen)
       return NULL;
-
-   printf("fd %d\n", fd);
 
    screen->base.destroy = panfrost_destroy_screen;
 
