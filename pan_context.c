@@ -158,14 +158,13 @@ trans_emit_fbd(struct panfrost_context *ctx)
 static void
 trans_new_frag_framebuffer(struct panfrost_context *ctx)
 {
-	uint8_t *framebuffer = ctx->framebuffer.gpu;
+	mali_ptr framebuffer = ctx->framebuffer.gpu;
 	int stride = ctx->stride;
 
 	/* The default is upside down from OpenGL's perspective */
 	if (ctx->flip_vertical) {
 		framebuffer += ctx->stride * (ctx->height - 1);
 		stride = -stride;
-		printf("Framebuffer start %llx\n", framebuffer);
 	}
 
 #ifdef SFBD
@@ -701,7 +700,6 @@ trans_make_fixed_blend_mode(const struct pipe_rt_blend_state *blend, struct mali
 			return false;
 
 	out->rgb_mode = rgb_mode;
-	printf("Made %x\n", rgb_mode);
 	out->alpha_mode = alpha_mode;
 
 	/* Gallium and Mali represent colour masks identically. XXX: Static assert for future proof */
@@ -917,12 +915,6 @@ trans_emit_vertex_data(struct panfrost_context *ctx)
 		attrs[i].stride = buf->stride;
 		attrs[i].size = buf->stride * (ctx->payload_vertex.draw_start + ctx->vertex_count);
 		attrs[i].elements = panfrost_upload(&ctx->cmdstream, rsrc->cpu[0] + buf->buffer_offset, attrs[i].size, false) | 1;
-
-		float *a = (rsrc->cpu[0] + buf->buffer_offset);
-		for (int j = 0; j < attrs[i].size/4; ++j) {
-			printf("%f ", a[j]);
-		}
-		printf("\n");
 	}
 
 	for (int i = 0; i < ctx->varying_count; ++i) {
@@ -2007,8 +1999,6 @@ panfrost_transfer_map(struct pipe_context *pctx,
 
 		/* Set the CPU mapping to that of the depth/stencil buffer in memory, untiled */
 		rsrc->cpu[level] = ctx->depth_stencil_buffer.cpu;
-		printf("DS target so %p\n", ctx->depth_stencil_buffer.cpu);
-
 	}
 
 	return rsrc->cpu[level] + transfer->box.x + transfer->box.y * transfer->stride;
@@ -2085,7 +2075,6 @@ panfrost_bind_blend_state(struct pipe_context *pipe,
 
 	/* Shader itself is not dirty, but the shader core is */
 	ctx->dirty |= PAN_DIRTY_FS;
-	printf("Blend core dirty\n");
 }
 
 static void
@@ -2221,9 +2210,6 @@ panfrost_set_viewport_states(struct pipe_context *pipe,
 	assert(num_viewports == 1);
 
 	const struct pipe_viewport_state *vp = &viewports[0];
-	printf("Scale: %f, %f, %f\n", vp->scale[0], vp->scale[1], vp->scale[2]);
-	printf("Translate: %f, %f, %f\n", vp->translate[0], vp->translate[1], vp->translate[2]);
-
 	ctx->viewports = viewports;
 
 	/* TODO */
@@ -2453,8 +2439,6 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
 
-	printf("(%llx)\n", framebuffer_import.gpu_va);
-	
 	uint64_t gpu_addr = mmap(NULL, framebuffer_import.va_pages * 4096, 3, 1, ctx->fd, framebuffer_import.gpu_va);
 
 	/* TODO: Reenable imports when we understand the new kernel API */
@@ -2463,7 +2447,6 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 
 	ctx->framebuffer.gpu = gpu_addr;
 	ctx->framebuffer.size = ctx->stride * ctx->height;
-	printf("Framebuffer: %llx - %llx (vs %llx)\n", gpu_addr, gpu_addr + framebuffer_sz, addr);
 }
 
 static void
