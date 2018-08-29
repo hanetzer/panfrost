@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "pan_nondrm.h"
 
 /* TODO: What does this actually have to be? */
@@ -94,6 +95,12 @@ pandev_upload_sequential(mali_ptr base, void *base_map, const void *data, size_t
 mali_ptr
 panfrost_upload(struct panfrost_memory *mem, const void *data, size_t sz, bool no_pad)
 {
+	/* Bounds check */
+	if ((mem->stack_bottom + sz) >= mem->size) {
+		printf("Out of memory, tried to upload %d but only %d available\n", sz, mem->size - mem->stack_bottom);
+		assert(0);
+	}
+
 	return pandev_upload(-1, &mem->stack_bottom, mem->gpu, mem->cpu, data, sz, no_pad);
 }
 
