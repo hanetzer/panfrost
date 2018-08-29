@@ -388,7 +388,6 @@ trans_invalidate_frame(struct panfrost_context *ctx)
 		ctx->dirty |= PAN_DIRTY_RASTERIZER;
 
 	/* Viewport */
-	/* XXX: Galliumify for realsies */
 
         trans_viewport(ctx, 0.0, 1.0, 0, 0, ctx->width, ctx->height);
 	ctx->dirty |= PAN_DIRTY_VIEWPORT;
@@ -1537,7 +1536,6 @@ panfrost_create_vertex_elements_state(
 	memcpy(so->pipe, elements, sizeof(*elements) * num_elements);
 
 	for (int i = 0; i < num_elements; ++i) {
-		/* XXX: What if they're all packed into the same buffer? */
 		so->hw[i].index = elements[i].vertex_buffer_index;
 		
 		enum pipe_format fmt = elements[i].src_format;
@@ -1688,7 +1686,6 @@ panfrost_bind_fs_state(
 
 	ctx->fs = hwcso;
 
-	/* XXX TODO: Actual compilation pipeline */
 	if (hwcso) {
 		if (!ctx->fs->compiled) {
 			panfrost_shader_compile(ctx, &ctx->fs->tripipe, NULL, JOB_TYPE_TILER, hwcso);
