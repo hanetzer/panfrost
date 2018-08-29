@@ -980,6 +980,10 @@ panfrost_emit_for_draw(struct panfrost_context *ctx)
 
 #undef COPY
 
+		/* Assign the stencil refs late */
+		ctx->fragment_shader_core.stencil_front.ref = ctx->stencil_ref.ref_value[0];
+		ctx->fragment_shader_core.stencil_back.ref = ctx->stencil_ref.ref_value[1];
+
 		ctx->payload_tiler.postfix._shader_upper = panfrost_upload(&ctx->cmdstream_persistent, &ctx->fragment_shader_core, sizeof(struct mali_shader_meta), true) >> 4;
 
 #ifdef T8XX
@@ -1792,9 +1796,7 @@ panfrost_set_stencil_ref(
 		const struct pipe_stencil_ref *ref)
 {
 	struct panfrost_context *ctx = panfrost_context(pctx);
-
-	ctx->fragment_shader_core.stencil_front.ref = ref->ref_value[0];
-	ctx->fragment_shader_core.stencil_back.ref = ref->ref_value[1];
+	ctx->stencil_ref = *ref;
 
 	/* Shader core dirty */
 	ctx->dirty |= PAN_DIRTY_FS;
