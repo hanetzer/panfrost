@@ -47,7 +47,7 @@ struct slowfb_info slowfb_init(uint8_t *framebuffer, int width, int height) {
 #endif
 
 	struct slowfb_info info = {
-		.framebuffer = image->data,
+		.framebuffer = (uint8_t *) image->data,
 		.stride = image->bytes_per_line
 	};
 

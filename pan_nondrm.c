@@ -32,7 +32,7 @@ pandev_ioctl(int fd, unsigned long request, void *args)
 {
 	union mali_ioctl_header *h = args;
 	h->id = ((_IOC_TYPE(request) & 0xF) << 8) | _IOC_NR(request);
-	assert(ioctl(fd, request, args) == 0);
+	return ioctl(fd, request, args);
 }
 
 int
@@ -48,6 +48,8 @@ pandev_general_allocate(int fd, int va_pages, int commit_pages, int extent, int 
 	assert(pandev_ioctl(fd, MALI_IOCTL_MEM_ALLOC, &args) == 0);
 
 	*out = args.gpu_va;
+
+	return 0;
 }
 
 int
