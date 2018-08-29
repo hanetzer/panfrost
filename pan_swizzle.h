@@ -19,14 +19,14 @@
 #include "pan_nondrm.h"
 
 void
-trans_generate_space_filler_indices(void);
+panfrost_generate_space_filler_indices(void);
 
 void
-trans_texture_swizzle(int width, int height, int bytes_per_pixel, int source_stride, 
+panfrost_texture_swizzle(int width, int height, int bytes_per_pixel, int source_stride, 
 		   const uint8_t *pixels,
 		   uint8_t *ldest);
 
 unsigned
-trans_swizzled_size(int width, int height, int bytes_per_pixel);
+panfrost_swizzled_size(int width, int height, int bytes_per_pixel);
 
 #endif 

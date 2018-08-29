@@ -44,7 +44,7 @@ uint32_t space_filler[16][16];
 uint32_t space_filler_packed4[16][4];
 
 void
-trans_generate_space_filler_indices()
+panfrost_generate_space_filler_indices()
 {
 	for (int y = 0; y < 16; ++y) {
 		for (int x = 0; x < 16; ++x) {
@@ -146,7 +146,7 @@ swizzle_bpp4_align16(int width, int height, int source_stride, int block_pitch,
 }
 
 void
-trans_texture_swizzle(int width, int height, int bytes_per_pixel, int source_stride,
+panfrost_texture_swizzle(int width, int height, int bytes_per_pixel, int source_stride,
 		   const uint8_t *pixels,
 		   uint8_t *ldest)
 {
@@ -186,7 +186,7 @@ trans_texture_swizzle(int width, int height, int bytes_per_pixel, int source_str
 
 
 unsigned
-trans_swizzled_size(int width, int height, int bytes_per_pixel)
+panfrost_swizzled_size(int width, int height, int bytes_per_pixel)
 {
 	/* Calculate maximum size, overestimating a bit */
 	int block_pitch = ALIGN(width, 16) >> 4; 
@@ -202,7 +202,7 @@ trans_swizzled_size(int width, int height, int bytes_per_pixel)
 #define TW 1920
 #define TH 1080
 void main() {
-	trans_generate_space_filler_indices();
+	panfrost_generate_space_filler_indices();
 
 	uint8_t in[TW*TH*4];
 	for(int i = 0; i < TW*TH*4; ++i) in[i] = i;
@@ -211,8 +211,8 @@ void main() {
 
 	for (int i = 0; i < 60; ++i) {
 		//swizzle_bpp4_align16(TW, TH, TW*4, TW>>4, (uint32_t *) in, (uint32_t *) out);
-		//trans_texture_swizzle_bpp4(TW, TH, TW*4, (uint32_t *) in, (uint32_t *) out);
-		//trans_texture_swizzle(TW, TH, 4, TW*4, (uint32_t *) in, (uint32_t *) out);
+		//panfrost_texture_swizzle_bpp4(TW, TH, TW*4, (uint32_t *) in, (uint32_t *) out);
+		//panfrost_texture_swizzle(TW, TH, 4, TW*4, (uint32_t *) in, (uint32_t *) out);
 
 		int block_pitch = ALIGN(TW, 16) >> 4; 
 		swizzle_bpp1_align16(TW, TH, TW, (block_pitch * 256 >> 4), in, (uint8_t *) out);
@@ -220,7 +220,7 @@ void main() {
 
 #if 0
 	uint8_t *reference = malloc(TW*TH*4*2);
-	trans_texture_swizzle(TW, TH, 1, TW, (uint8_t *) in, (uint8_t *) reference);
+	panfrost_texture_swizzle(TW, TH, 1, TW, (uint8_t *) in, (uint8_t *) reference);
 
 	if(memcmp(reference, out, TW*TH*4)) printf("XXX\n");
 #endif
