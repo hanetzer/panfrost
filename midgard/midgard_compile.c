@@ -1011,7 +1011,7 @@ allocate_first_free_register(compiler_context *ctx)
 static int
 normal_ssa_to_register(compiler_context *ctx, midgard_instruction *ins, int ssa)
 {
-	int reg = _mesa_hash_table_u64_search(ctx->ssa_to_register, ssa + 1);
+	int reg = (int) _mesa_hash_table_u64_search(ctx->ssa_to_register, ssa + 1);
 
 	if (reg) {
 		reg -= 1; /* Intentional off-by-one */
@@ -1154,7 +1154,7 @@ can_ld_st_run_concurrent(midgard_load_store_word *first,
 	/* No registers are touched for the case of two stores, therefore no
 	 * hazard. */
 
-	if (OP_IS_STORE(first) && OP_IS_STORE(second))
+	if (OP_IS_STORE(first->op) && OP_IS_STORE(second->op))
 		return true;
 
 	/* If one is a load, the data hazard comes up iff the two instructions write to the same place, */
@@ -1683,7 +1683,7 @@ embedded_to_inline_constant(compiler_context *ctx)
 				 * vector by checking if all accessed values
 				 * (by the swizzle) are the same. */
 
-				uint32_t *cons = ins->constants;
+				uint32_t *cons = (uint32_t *) ins->constants;
 				uint32_t value = cons[src->swizzle & 3];
 
 				bool is_vector = false;
@@ -1726,7 +1726,7 @@ embedded_to_inline_constant(compiler_context *ctx)
 static void
 map_ssa_to_alias(compiler_context *ctx, int *ref)
 {
-	uintptr_t alias = _mesa_hash_table_u64_search(ctx->ssa_to_alias, *ref + 1);
+	unsigned int alias = (unsigned int) _mesa_hash_table_u64_search(ctx->ssa_to_alias, *ref + 1);
 	
 	if (alias) {
 		/* Remove entry in leftovers to avoid a redunant fmov */
@@ -1934,11 +1934,11 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 	compiler_context *ctx = &ictx;
 
-        /* Prepend epilogue uniforms if necessary */
-        nir_variable *viewport_uniform = NULL;
- 
+	/* Append epilogue uniforms if necessary. The cmdstream depends on
+	 * these being at the -end-; see assign_var_locations. */
+
         if (ctx->stage == MESA_SHADER_VERTEX) {
-                viewport_uniform = nir_variable_create(nir, nir_var_uniform, glsl_vec4_type(), "viewport");
+                nir_variable_create(nir, nir_var_uniform, glsl_vec4_type(), "viewport");
         }
 
 
