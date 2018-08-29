@@ -171,8 +171,8 @@ struct panfrost_context {
 	struct primconvert_context *primconvert;
 	struct blitter_context *blitter;
 
-	struct pipe_viewport_state *viewports;
-	struct pipe_scissor_state *scissors;
+	struct pipe_viewport_state pipe_viewport;
+	struct pipe_scissor_state scissor;
 	struct pipe_blend_state *blend;
 	struct pipe_depth_stencil_alpha_state *depth_stencil;
 	struct pipe_stencil_ref *stencil_ref;

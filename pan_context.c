@@ -84,6 +84,7 @@ trans_set_framebuffer_msaa(struct panfrost_context *ctx, bool enabled)
 
 /* Framebuffer descriptor */
 
+#ifdef SFBD
 static void
 trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int h)
 {
@@ -97,6 +98,7 @@ trans_set_framebuffer_resolution(struct mali_single_framebuffer *fb, int w, int 
 
 	fb->resolution_check = ((w + h) / 3) << 4;
 }
+#endif
 
 static PANFROST_FRAMEBUFFER
 trans_emit_fbd(struct panfrost_context *ctx)
@@ -1084,7 +1086,7 @@ trans_emit_for_draw(struct panfrost_context *ctx)
 	}
 
 	/* Generate the viewport vector of the form: <width, height, centerx, centery> */
-	const struct pipe_viewport_state *vp = &ctx->viewports[0];
+	const struct pipe_viewport_state *vp = &ctx->pipe_viewport;
 
 	float viewport_vec4[] = {
 		2.0 * vp->scale[0],
@@ -1445,7 +1447,7 @@ panfrost_generic_cso_delete(struct pipe_context *pctx, void *hwcso)
 static void
 panfrost_set_scissor(struct panfrost_context *ctx)
 {
-	const struct pipe_scissor_state *ss = &ctx->scissors[0];
+	const struct pipe_scissor_state *ss = &ctx->scissor;
 
 	if (!ss) {
 		/* XXX: How to handle? */
@@ -2025,6 +2027,7 @@ panfrost_set_framebuffer_state(struct pipe_context *pctx,
 	 
 	 struct panfrost_screen* scr = (struct panfrost_screen *) pctx->screen;
 	 struct pipe_surface *surf = ctx->pipe_framebuffer.cbufs[i];
+	 /* TODO: Do something with surf */
       }
    }
 
@@ -2103,7 +2106,7 @@ panfrost_bind_depth_stencil_state(struct pipe_context *pipe,
 					void *cso)		
 {
 	struct panfrost_context *ctx = panfrost_context(pipe);
-	const struct pipe_depth_stencil_alpha_state *depth_stencil = cso;
+	struct pipe_depth_stencil_alpha_state *depth_stencil = cso;
 	ctx->depth_stencil = depth_stencil;
 
 	if (!depth_stencil)
@@ -2209,8 +2212,7 @@ panfrost_set_viewport_states(struct pipe_context *pipe,
 	assert(start_slot == 0);
 	assert(num_viewports == 1);
 
-	const struct pipe_viewport_state *vp = &viewports[0];
-	ctx->viewports = viewports;
+	ctx->pipe_viewport = *viewports;
 
 	/* TODO */
 }
@@ -2226,7 +2228,7 @@ panfrost_set_scissor_states(struct pipe_context *pipe,
 	assert(start_slot == 0);
 	assert(num_scissors == 1);
 
-	ctx->scissors = scissors;
+	ctx->scissor = *scissors;
 
 	panfrost_set_scissor(ctx);
 }
@@ -2300,12 +2302,11 @@ panfrost_transfer_unmap(struct pipe_context *pctx,
 static void panfrost_blit(struct pipe_context *pipe,
                     const struct pipe_blit_info *info)
 {
-   struct panfrost_context *pan = panfrost_context(pipe);
-
    /* STUB */
    printf("Skipping blit XXX\n");
    return;
 #if 0
+   struct panfrost_context *pan = panfrost_context(pipe);
 
 #if 0
    if (info->render_condition_enable && !panfrost_check_render_cond(pan))
@@ -2439,7 +2440,8 @@ trans_setup_framebuffer(struct panfrost_context *ctx, uint32_t *addr, int width,
 
 	pandev_ioctl(ctx->fd, MALI_IOCTL_MEM_IMPORT, &framebuffer_import);
 
-	uint64_t gpu_addr = mmap(NULL, framebuffer_import.va_pages * 4096, 3, 1, ctx->fd, framebuffer_import.gpu_va);
+	/* It feels like this mmap is backwards :p */
+	uint64_t gpu_addr = (uint64_t) mmap(NULL, framebuffer_import.va_pages * 4096, 3, 1, ctx->fd, framebuffer_import.gpu_va);
 
 	/* TODO: Reenable imports when we understand the new kernel API */
 
