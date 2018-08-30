@@ -393,6 +393,12 @@ static void
 alias_ssa(compiler_context *ctx, int dest, int src, bool literal_dest)
 {
 	if (literal_dest) {
+		/* If this is just a constant, emit a move for it */
+		int is_constant = _mesa_hash_table_u64_search(ctx->ssa_constants, src + 1);
+
+		if (is_constant)
+			EMIT(fmov, src, blank_alu_src, dest, true, midgard_outmod_none);
+
 		_mesa_hash_table_u64_insert(ctx->register_to_ssa, src + 1, (void *) ((uintptr_t) dest + 1));
 	} else {
 		_mesa_hash_table_u64_insert(ctx->ssa_to_alias, dest + 1, (void *) ((uintptr_t) src + 1));
@@ -1999,7 +2005,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			}
 
 			inline_alu_constants(ctx);
-			embedded_to_inline_constant(ctx);
+			//embedded_to_inline_constant(ctx);
 
 			//eliminate_varying_mov(ctx);
 
