@@ -930,6 +930,9 @@ panfrost_emit_vertex_data(struct panfrost_context *ctx)
 
 		/* Varyings appear to need 64-byte alignment */
 		ctx->varying_height += ALIGN(varyings[i].size, 64);
+
+		/* Ensure that we fit */
+		assert(ctx->varying_height < ctx->varying_mem.size);
 	}
 
 	ctx->payload_vertex.postfix.attributes = panfrost_upload(&ctx->cmdstream, attrs, ctx->vertex_buffer_count * sizeof(struct mali_attr), false);
