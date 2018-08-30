@@ -1823,9 +1823,9 @@ write_transformed_position(nir_builder *b, nir_src input_point_src, int uniform_
 	nir_ssa_def *viewport_offset = nir_channels(b, viewport_vec4, 0x8 | 0x4);
 #endif
 
-	nir_ssa_def *viewport_width = nir_imm_float(b, 2000);
-	nir_ssa_def *viewport_height = nir_imm_float(b, 1000);
-	nir_ssa_def *viewport_offset = nir_vec2(b, nir_imm_float(b, 1000), nir_imm_float(b, 500));
+	nir_ssa_def *viewport_width = nir_imm_float(b, 2048);
+	nir_ssa_def *viewport_height = nir_imm_float(b, 1280);
+	nir_ssa_def *viewport_offset = nir_vec2(b, nir_imm_float(b, 1024), nir_imm_float(b, 640));
 
 	/* XXX: From uniforms? */
 	nir_ssa_def *depth_near = nir_imm_float(b, 0.0);

@@ -140,7 +140,7 @@ panfrost_emit_fbd(struct panfrost_context *ctx)
 		/* Presumably corresponds to unknown_address_X of SFBD */
 		.zero2 = ctx->scratchpad.gpu,
 		.zero5 = ctx->misc_0.gpu,
-		.zero6 = ctx->misc_0.gpu + 512,
+		.zero6 = ctx->misc_0.gpu + 109568, /* Depends on the size of the framebuffer and the number of vertices */
 
 		/* tiler_heap_start */
 		.zero7 = ctx->tiler_heap.gpu,
