@@ -87,10 +87,10 @@ struct panfrost_context {
 	struct panfrost_memory depth_stencil_buffer;
 
 	/* Common framebuffer settings */
-	int width;
-	int height;
+	unsigned width;
+	unsigned height;
 	int32_t stride; /* Signed as framebuffers can be flipped vertically */
-	int bytes_per_pixel;
+	unsigned bytes_per_pixel;
 	bool has_alpha_channel;
 
 	/* Set for OpenGL's default mode. */
@@ -125,7 +125,7 @@ struct panfrost_context {
 	 * and tiler jobs, linked to the fragment job at the end. See the
 	 * presentations for more information how this works */
 
-	int draw_count;
+	unsigned draw_count;
 
 	mali_ptr set_value_job;
 	mali_ptr vertex_jobs[MAX_DRAW_CALLS];
@@ -134,13 +134,13 @@ struct panfrost_context {
 	/* Dirty flags are setup like any other driver */
 	int dirty;
 
-	int vertex_count;
+	unsigned vertex_count;
 
 	struct mali_attr attributes[PIPE_MAX_ATTRIBS];
 
-	int varyings_stride[MAX_VARYINGS];
-	int varying_count;
-	int varying_height;
+	unsigned varyings_stride[MAX_VARYINGS];
+	unsigned varying_count;
+	unsigned varying_height;
 	struct mali_unknown6 varyings_descriptor_0;
 	struct mali_unknown6 varyings_descriptor_1;
 
@@ -160,13 +160,13 @@ struct panfrost_context {
 	struct panfrost_vertex_state *vertex;
 
 	struct pipe_vertex_buffer *vertex_buffers;
-	int vertex_buffer_count;
+	unsigned vertex_buffer_count;
 
 	struct panfrost_sampler_state *samplers[PIPE_SHADER_TYPES][PIPE_MAX_SAMPLERS];
-	int sampler_count[PIPE_SHADER_TYPES];
+	unsigned sampler_count[PIPE_SHADER_TYPES];
 
 	struct panfrost_sampler_view *sampler_views[PIPE_SHADER_TYPES][PIPE_MAX_SHADER_SAMPLER_VIEWS];
-	int sampler_view_count[PIPE_SHADER_TYPES];
+	unsigned sampler_view_count[PIPE_SHADER_TYPES];
 
 	struct primconvert_context *primconvert;
 	struct blitter_context *blitter;
