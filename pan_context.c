@@ -2453,14 +2453,14 @@ panfrost_setup_hardware(struct panfrost_context *ctx)
 {
 	ctx->fd = pandev_open();
 
-	panfrost_allocate_slab(ctx, &ctx->cmdstream, 8*64*2, true, true, 0, 0, 0);
-	panfrost_allocate_slab(ctx, &ctx->cmdstream_persistent, 8*64*4, true, true, 0, 0, 0);
+	panfrost_allocate_slab(ctx, &ctx->cmdstream, 8*64*4, true, true, 0, 0, 0);
+	panfrost_allocate_slab(ctx, &ctx->cmdstream_persistent, 8*64*8, true, true, 0, 0, 0);
 	panfrost_allocate_slab(ctx, &ctx->textures, 4*64*64, true, true, 0, 0, 0);
-	panfrost_allocate_slab(ctx, &ctx->scratchpad, 32, true, true, 0, 0, 0);
-	panfrost_allocate_slab(ctx, &ctx->varying_mem, 32, false, true, 0, 0, 0);
+	panfrost_allocate_slab(ctx, &ctx->scratchpad, 64, true, true, 0, 0, 0);
+	panfrost_allocate_slab(ctx, &ctx->varying_mem, 256, false, true, 0, 0, 0);
 	panfrost_allocate_slab(ctx, &ctx->shaders, 4096, true, false, MALI_MEM_PROT_GPU_EX, 0, 0);
 	panfrost_allocate_slab(ctx, &ctx->tiler_heap, 32768, false, false, 0, 0, 0);
-	panfrost_allocate_slab(ctx, &ctx->misc_0, 64, false, false, 0, 0, 0);
+	panfrost_allocate_slab(ctx, &ctx->misc_0, 128, false, false, 0, 0, 0);
 
 #ifdef USE_SLOWFB
 	panfrost_setup_framebuffer(ctx, NULL, 2048, 1280);
