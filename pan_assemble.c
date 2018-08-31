@@ -112,7 +112,9 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 	dst = compiled.data;
 	printf("Size: %d\n", last_shader_size);
 	printf("dst: %p\n", dst);
-	FILE *fp = fopen("/dev/shm/s.bin", "wb");
+	char name[128];
+	snprintf(name, 128, "/dev/shm/%d.bin", type);
+	FILE *fp = fopen(name, "wb");
 	fwrite(dst, 1, last_shader_size, fp);
 	fclose(fp);
 
@@ -122,14 +124,20 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 
     /* TODO: From compiler */
 
+	/* Measured in vec4 words */
+	int varying_count = 1;
+
     if (type == JOB_TYPE_VERTEX) {
 	    meta->attribute_count = 3;
-	    meta->varying_count = 3;
+
+	    /* Vertex shader counts gl_Position as a varying */
+	    meta->varying_count = varying_count + 2;
+
 	    meta->midgard1.uniform_count = 12;
 	    meta->midgard1.unknown1 = 1; /* XXX: WTF is this?! */
     } else {
 	    meta->attribute_count = 0;
-	    meta->varying_count = 1;
+	    meta->varying_count = varying_count;
 	    meta->texture_count = 1;
 	    meta->sampler_count = 1;
 	    meta->midgard1.uniform_count = 12;
@@ -144,11 +152,19 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
      * arbitrary */
 
     if (type == JOB_TYPE_VERTEX) {
-	    /* vec4 */
-	    ctx->varyings_stride[0] = 2 * sizeof(float);
+	    /* Setup two buffers, one for position, the other for normal
+	     * varyings, as seen in traces. TODO: Are there other
+	     * configurations we might use? */
 
-	    /* gl_Position */
+	    ctx->varying_buffer_count = 2;
+
+	    /* mediump vec4s sequentially */
+	    ctx->varyings_stride[0] = (2 * sizeof(float)) * varying_count;
+
+	    /* highp gl_Position */
 	    ctx->varyings_stride[1] = 4 * sizeof(float);
+
+	    /* Setup gl_Position and its weirdo analogue */
 
 	    struct mali_attr_meta position_meta = {
 		    .index = 1,
@@ -158,7 +174,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 		    .unknown1 = 0x1a22
 	    };
 
-	    struct mali_attr_meta vec4_varying_meta = {
+	    struct mali_attr_meta position_meta_prime = {
 		    .index = 0,
 		    .type = 7, /* float */
 		    .nr_components = MALI_POSITIVE(4),
@@ -166,30 +182,33 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
 		    .unknown1 = 0x2490
 	    };
 
-	    struct mali_attr_meta vec4_varying_meta_2 = {
-		    .index = 0,
-		    .type = 7, /* float */
-		    .nr_components = MALI_POSITIVE(4),
-		    .not_normalised = 1,
-		    .unknown1 = 0x1a22,
-		    .is_int_signed = 1,
+	    ctx->vertex_only_varyings[0] = position_meta;
+	    ctx->vertex_only_varyings[1] = position_meta_prime;
+
+	    /* Setup actual varyings. XXX: Don't assume vec4 */
+
+	    for (int i = 0; i < varying_count; ++i) {
+		    struct mali_attr_meta vec4_varying_meta = {
+			    .index = 0,
+			    .type = 7, /* float */
+			    .nr_components = MALI_POSITIVE(4),
+			    .not_normalised = 1,
+			    .unknown1 = 0x1a22,
+
+			    /* mediump => half-floats */
+			    .is_int_signed = 1,
+
+			    /* Set offset to keep everything back-to-back in
+			     * the same buffer */
+			    .src_offset = 8 * i,
 #ifdef T6XX
-		    .unknown2 = 1,
+			    .unknown2 = 1,
 #endif
-	    };
+		    };
 
+		    ctx->varyings[i] = vec4_varying_meta;
+	    }
 
-	    u64 *u0 = (u64 *) &position_meta;
-	    u64 *u1 = (u64 *) &vec4_varying_meta;
-	    u64 *u2 = (u64 *) &vec4_varying_meta_2;
-
-	    ctx->varying_count = 2;
-
-	    ctx->varyings_descriptor_0.unknown0 = *u0;
-	    ctx->varyings_descriptor_0.unknown1 = *u1;
-
-	    ctx->varyings_descriptor_1.unknown0 = *u2;
-	    ctx->varyings_descriptor_1.unknown1 = *u2;
-
+	    ctx->varying_count = varying_count;
     }
 }

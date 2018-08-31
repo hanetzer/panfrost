@@ -138,11 +138,22 @@ struct panfrost_context {
 
 	struct mali_attr attributes[PIPE_MAX_ATTRIBS];
 
+	/* Varyings information: stride of each chunk of memory used for
+	 * varyings (similar structure with attributes). Count is just the
+	 * number of vec4's. Buffer count is the number of varying chunks (<=
+	 * count). Height is used to calculate gl_Position's position ("it's
+	 * not a pun, Alyssa!"). Vertex-only varyings == descriptor for
+	 * gl_Position and something else apparently occupying the same space.
+	 * Varyings == main varyings descriptors following typical mali_attr
+	 * conventions. */
+
 	unsigned varyings_stride[MAX_VARYINGS];
 	unsigned varying_count;
+	unsigned varying_buffer_count;
 	unsigned varying_height;
-	struct mali_unknown6 varyings_descriptor_0;
-	struct mali_unknown6 varyings_descriptor_1;
+	
+	struct mali_attr_meta vertex_only_varyings[2];
+	struct mali_attr_meta varyings[PIPE_MAX_ATTRIBS];
 
 	struct mali_viewport viewport;
 	PANFROST_FRAMEBUFFER vt_framebuffer;

@@ -57,10 +57,17 @@ static bool FORCE_MSAA = true;
 static void
 panfrost_upload_varyings_descriptor(struct panfrost_context *ctx)
 {
-        mali_ptr unknown6_1_p = panfrost_upload(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_0, sizeof(struct mali_unknown6), true);
-        mali_ptr unknown6_2_p = panfrost_upload_sequential(&ctx->cmdstream_persistent, &ctx->varyings_descriptor_1, sizeof(struct mali_unknown6));
-        ctx->payload_vertex.postfix.varying_meta = (unknown6_1_p) | 0x0;
-        ctx->payload_tiler.postfix.varying_meta = (unknown6_2_p) | 0x8;
+	/* First, upload gl_Position varyings */
+	mali_ptr gl_Position = panfrost_upload(&ctx->cmdstream_persistent, ctx->vertex_only_varyings, sizeof(ctx->vertex_only_varyings), true);
+
+	/* Then, upload normal varyings for vertex shaders */
+	mali_ptr varyings_vertex = panfrost_upload_sequential(&ctx->cmdstream_persistent, ctx->varyings, sizeof(ctx->varyings[0]) * ctx->varying_count);
+
+	/* Then, upload normal varyings for fragment shaders (duplicating) */
+	mali_ptr varyings_fragment = panfrost_upload_sequential(&ctx->cmdstream_persistent, ctx->varyings, sizeof(ctx->varyings[0]) * ctx->varying_count);
+
+        ctx->payload_vertex.postfix.varying_meta = gl_Position;
+        ctx->payload_tiler.postfix.varying_meta = varyings_fragment;
 }
 
 /* TODO: Sample size, etc */
@@ -919,13 +926,13 @@ panfrost_emit_vertex_data(struct panfrost_context *ctx)
 		attrs[i].elements = panfrost_upload(&ctx->cmdstream, rsrc->cpu[0] + buf->buffer_offset, attrs[i].size, false) | 1;
 	}
 
-	for (int i = 0; i < ctx->varying_count; ++i) {
+	for (int i = 0; i < ctx->varying_buffer_count; ++i) {
 		varyings[i].elements = (ctx->varying_mem.gpu + ctx->varying_height) | 1;
 		varyings[i].size = ctx->varyings_stride[i] * ctx->vertex_count;
 		varyings[i].stride = ctx->varyings_stride[i];
 
 		/* gl_Position varying is always last by convention */
-		if ((i + 1) == ctx->varying_count)
+		if ((i + 1) == ctx->varying_buffer_count)
 			ctx->payload_tiler.postfix.position_varying = ctx->varying_mem.gpu + ctx->varying_height;
 
 		/* Varyings appear to need 64-byte alignment */
@@ -937,7 +944,7 @@ panfrost_emit_vertex_data(struct panfrost_context *ctx)
 
 	ctx->payload_vertex.postfix.attributes = panfrost_upload(&ctx->cmdstream, attrs, ctx->vertex_buffer_count * sizeof(struct mali_attr), false);
 
-	mali_ptr varyings_p = panfrost_upload(&ctx->cmdstream, &varyings, ctx->varying_count * sizeof(struct mali_attr), false);
+	mali_ptr varyings_p = panfrost_upload(&ctx->cmdstream, &varyings, ctx->varying_buffer_count * sizeof(struct mali_attr), false);
 	ctx->payload_vertex.postfix.varyings = varyings_p;
 	ctx->payload_tiler.postfix.varyings = varyings_p;
 }
