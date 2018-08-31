@@ -125,7 +125,7 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
     /* TODO: From compiler */
 
 	/* Measured in vec4 words */
-	int varying_count = 1;
+	int varying_count = 2;
 
     if (type == JOB_TYPE_VERTEX) {
 	    meta->attribute_count = 3;

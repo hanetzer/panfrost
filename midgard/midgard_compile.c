@@ -799,7 +799,6 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 			assert(const_offset && "no indirect outputs");
 
 			offset = nir_intrinsic_base(instr) + const_offset->u32[0];
-			offset = offset * 2 + (nir_intrinsic_component(instr) / 2);
 
 			reg = nir_src_index(&instr->src[0]);
 
@@ -827,6 +826,15 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 				bool high_varying_register = false;
 
 				EMIT(fmov, reg, blank_alu_src, REGISTER_VARYING_BASE + high_varying_register, true, midgard_outmod_none);
+
+				/* Compute offset: gl_Position is zero. The
+				 * first varying is two. The nth varying is 2+n
+				 * for zero-indexed n. Varying #1 is unused.
+				 * See the corresponding structures in the
+				 * command stream. */
+
+				if (offset > 0)
+					offset += 1;
 
 				midgard_instruction ins = m_store_vary_32(high_varying_register, offset);
 				ins.load_store.unknown = 0x1E9E; /* XXX: What is this? */
