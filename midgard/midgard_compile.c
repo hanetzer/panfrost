@@ -541,7 +541,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 		ALU_CASE(MUL, 2, ine, ine);
 		ALU_CASE(MUL, 2, ilt, ilt);
 		//ALU_CASE(MUL, 2, ile);
-		//ALU_CASE(MUL, 2, icsel, icsel);
+		//ALU_CASE(ADD, 2, icsel, icsel);
 		//ALU_CASE(LUT, 0, fatan_pt2);
 		ALU_CASE(LUT, 0, frcp, frcp);
 		ALU_CASE(LUT, 0, frsq, frsqrt);
@@ -574,7 +574,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 		ALU_CASE(MUL, 2, bany_inequal4, ibany_neq);
 
 		case nir_op_bcsel: {
-			unit = UNIT_MUL;
+			unit = UNIT_ADD;
 			components = 2;
 			op = midgard_alu_op_fcsel;
 
@@ -632,7 +632,6 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			 * cannot be transferred */
 
 			case midgard_alu_op_fmul:
-			case midgard_alu_op_fcsel:
 				break;
 
 			default:
@@ -1261,8 +1260,6 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 						case midgard_alu_op_fle: 
 						case midgard_alu_op_ilt: 
 						case midgard_alu_op_ile: 
-						case midgard_alu_op_fcsel: 
-						case midgard_alu_op_icsel: 
 						case midgard_alu_op_imin:
 						case midgard_alu_op_imax:
 							ains->unit = ains->vector ? ALU_ENAB_VEC_ADD : ALU_ENAB_SCAL_MUL;
