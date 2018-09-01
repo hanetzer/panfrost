@@ -62,7 +62,7 @@ int
 pandev_open()
 {
 
-	int fd = open("/dev/mali0", O_RDWR | O_NONBLOCK | O_CLOEXEC);
+	int fd = open("/dev/mali0", O_RDWR | O_CLOEXEC);
 	assert(fd != -1);
 
 #ifdef USE_LEGACY_KERNEL
