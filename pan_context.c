@@ -145,8 +145,7 @@ panfrost_emit_fbd(struct panfrost_context *ctx)
 		.width2 = MALI_POSITIVE(ctx->width),
 		.height2 = MALI_POSITIVE(ctx->height),
 
-		.unk1 = 0x1092,
-		.unk3 = 0x100,
+		.unk1 = 0x1080,
 
 		/* TODO: MRT */
 		.rt_count_1 = MALI_POSITIVE(1),
@@ -1287,8 +1286,10 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	/* XXX: flush_immediate was causing lock-ups wrt readpixels in dEQP. Investigate. */
 	/* If visual, we can stall a frame */
 
+#if 0
 	if (!flush_immediate)
 		force_flush_fragment(ctx);
+#endif
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1336,7 +1337,7 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	last_fragment_id = atoms[1].atom_number;
 
 	/* If readback, flush now (hurts the pipelined performance) */
-	if (flush_immediate)
+	//if (flush_immediate)
 		force_flush_fragment(ctx);
 #endif
 }
