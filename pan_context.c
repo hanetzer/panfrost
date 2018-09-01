@@ -1252,6 +1252,7 @@ allocate_atom()
 }
 
 int last_fragment_id = -1;
+int last_fragment_flushed = true;
 
 /* Forces a flush, to make sure everything is consistent.
  * Bad for parallelism. Necessary for glReadPixels etc. Use cautiously.
@@ -1260,12 +1261,14 @@ int last_fragment_id = -1;
 static void
 force_flush_fragment(struct panfrost_context *ctx)
 {
-	if (last_fragment_id != -1) {
+	if (!last_fragment_flushed) {
 		uint8_t ev[/* 1 */ 4 + 4 + 8 + 8];
 
 		do {
 			read(ctx->fd, ev, sizeof(ev));
 		} while (ev[4] != last_fragment_id);
+
+		last_fragment_flushed = true;
 	}
 }
 
@@ -1277,6 +1280,10 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	/* Edge case if screen is cleared and nothing else */
 	bool has_draws = ctx->draw_count > 0;
 
+	/* Workaround a bizarre lockup (a hardware errata?) */
+	if (!has_draws)
+		flush_immediate = true;
+
 	/* A number of jobs are batched -- this must be linked and cleared */
 	panfrost_link_jobs(ctx);
 
@@ -1286,10 +1293,8 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	/* XXX: flush_immediate was causing lock-ups wrt readpixels in dEQP. Investigate. */
 	/* If visual, we can stall a frame */
 
-#if 0
 	if (!flush_immediate)
 		force_flush_fragment(ctx);
-#endif
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1335,9 +1340,10 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	    printf("Error submitting\n");
 
 	last_fragment_id = atoms[1].atom_number;
+	last_fragment_flushed = false;
 
 	/* If readback, flush now (hurts the pipelined performance) */
-	//if (flush_immediate)
+	if (flush_immediate)
 		force_flush_fragment(ctx);
 #endif
 }
