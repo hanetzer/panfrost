@@ -36,6 +36,17 @@ panfrost_flush(
 		struct pipe_fence_handle ** fence,
 		unsigned flags);
 
+static void
+panfrost_allocate_slab(struct panfrost_context *ctx,
+		    struct panfrost_memory *mem,
+		    size_t pages,
+		    bool mapped,
+		    bool same_va,
+		    int extra_flags,
+		    int commit_count,
+		    int extent);
+
+
 /* Don't use the mesa winsys; use our own X11 window with Xshm */
 #define USE_SLOWFB
 
@@ -134,7 +145,8 @@ panfrost_emit_fbd(struct panfrost_context *ctx)
 		.width2 = MALI_POSITIVE(ctx->width),
 		.height2 = MALI_POSITIVE(ctx->height),
 
-		.unk1 = 0x1080,
+		.unk1 = 0x1092,
+		.unk3 = 0x100,
 
 		/* TODO: MRT */
 		.rt_count_1 = MALI_POSITIVE(1),
@@ -377,6 +389,13 @@ panfrost_viewport(struct panfrost_context *ctx,
 static void
 panfrost_invalidate_frame(struct panfrost_context *ctx)
 {
+	/* misc_0 has to be constantly refreshed to avoid performance
+	 * exponential decay, for unclear reasons internal to t8xx */
+
+	panfrost_allocate_slab(ctx, &ctx->misc_0, 128, false, false, 0, 0, 0);
+	ctx->vt_framebuffer = panfrost_emit_fbd(ctx);
+	panfrost_new_frag_framebuffer(ctx);
+	
 	/* Reset varyings allocated */
 	ctx->varying_height = 0;
 
@@ -1266,12 +1285,10 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 
 #ifndef DRY_RUN
 	/* XXX: flush_immediate was causing lock-ups wrt readpixels in dEQP. Investigate. */
-#if 0
 	/* If visual, we can stall a frame */
 
 	if (!flush_immediate)
 		force_flush_fragment(ctx);
-#endif
 
 	mali_external_resource framebuffer[] = {
 		ctx->framebuffer.gpu | MALI_EXT_RES_ACCESS_EXCLUSIVE,
@@ -1319,7 +1336,7 @@ panfrost_submit_frame(struct panfrost_context *ctx, bool flush_immediate)
 	last_fragment_id = atoms[1].atom_number;
 
 	/* If readback, flush now (hurts the pipelined performance) */
-	//if (flush_immediate)
+	if (flush_immediate)
 		force_flush_fragment(ctx);
 #endif
 }
