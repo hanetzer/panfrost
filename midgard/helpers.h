@@ -1,5 +1,5 @@
 /* Author(s):
- *   Alyssa Rosenzweig
+ *  Alyssa Rosenzweig
  *
  * Copyright (c) 2018 Alyssa Rosenzweig (alyssa@rosenzweig.io)
  *
@@ -31,13 +31,13 @@
 
 /* ALU control words are single bit fields with a lot of space */
 
-#define ALU_ENAB_VEC_MUL    (1 << 17)
-#define ALU_ENAB_SCAL_ADD   (1 << 19)
-#define ALU_ENAB_VEC_ADD    (1 << 21)
-#define ALU_ENAB_SCAL_MUL   (1 << 23)
-#define ALU_ENAB_VEC_LUT    (1 << 25)
+#define ALU_ENAB_VEC_MUL  (1 << 17)
+#define ALU_ENAB_SCAL_ADD  (1 << 19)
+#define ALU_ENAB_VEC_ADD  (1 << 21)
+#define ALU_ENAB_SCAL_MUL  (1 << 23)
+#define ALU_ENAB_VEC_LUT  (1 << 25)
 #define ALU_ENAB_BR_COMPACT (1 << 26)
-#define ALU_ENAB_BRANCH     (1 << 27)
+#define ALU_ENAB_BRANCH   (1 << 27)
 
 /* Vector-independant shorthands for the above; these numbers are arbitrary and
  * not from the ISA. Convert to the above with unit_enum_to_midgard */
@@ -67,7 +67,7 @@
 #define REGISTER_VARYING_BASE 26
 #define REGISTER_OFFSET 27
 #define REGISTER_TEXTURE_BASE 28
-#define REGISTER_SELECT  31
+#define REGISTER_SELECT 31
 
 /* SSA helper aliases to mimic the registers. UNUSED_0 encoded as an inline
  * constant. UNUSED_1 encoded as REGISTER_UNUSED */
@@ -133,3 +133,58 @@ midgard_is_integer_op(int op)
 			return false;
 	}
 }
+
+/* Table of ALU opcodes, based on which units they can run on */
+
+#if 0
+ADD, fadd
+MUL, fmul
+MUL, fmin
+MUL, fmax
+MUL, imin
+MUL, imax
+MUL, fmov
+ADD, ffloor
+ADD, fceil
+MUL, fdot3
+MUL, fdot4
+ADD, iadd
+ADD, isub
+MUL, imul
+MUL, imov
+
+MUL, feq
+MUL, fne
+ADD, flt
+MUL, ieq
+MUL, ine
+MUL, ilt
+ADD, icsel
+LUT, frcp
+LUT, frsqrt
+LUT, fsqrt
+LUT, fexp2
+LUT, flog2
+
+ADD, f2i
+ADD, f2u
+ADD, i2f
+ADD, u2f
+
+LUT, fsin
+LUT, fcos
+
+ADD, iand
+ADD, ior
+ADD, ixor
+MUL, inot
+ADD, ishl
+ADD, iasr
+ADD, ilsr
+ADD, ilsr
+
+MUL, fball_eq
+MUL, fbany_neq
+MUL, iball_eq
+MUL, ibany_neq
+#endif
