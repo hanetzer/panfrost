@@ -134,57 +134,79 @@ midgard_is_integer_op(int op)
 	}
 }
 
-/* Table of ALU opcodes, based on which units they can run on */
+/* There are five ALU units: VMUL, VADD, SMUL, SADD, LUT. A given opcode is
+ * implemented on some subset of these units (or occassionally all of them).
+ * This table encodes a bit mask of valid units for each opcode, so the
+ * scheduler can figure where to plonk the instruction. */
 
-#if 0
-ADD, fadd
-MUL, fmul
-MUL, fmin
-MUL, fmax
-MUL, imin
-MUL, imax
-MUL, fmov
-ADD, ffloor
-ADD, fceil
-MUL, fdot3
-MUL, fdot4
-ADD, iadd
-ADD, isub
-MUL, imul
-MUL, imov
+/* Shorthands for each unit */
+#define UNIT_VMUL ALU_ENAB_VEC_MUL
+#define UNIT_SADD ALU_ENAB_SCAL_ADD
+#define UNIT_VADD ALU_ENAB_VEC_ADD
+#define UNIT_SMUL ALU_ENAB_SCAL_MUL
+#define UNIT_VLUT ALU_ENAB_VEC_LUT
 
-MUL, feq
-MUL, fne
-ADD, flt
-MUL, ieq
-MUL, ine
-MUL, ilt
-ADD, icsel
-LUT, frcp
-LUT, frsqrt
-LUT, fsqrt
-LUT, fexp2
-LUT, flog2
+/* Shorthands for usual combinations of units */
+#define UNITS_MUL (UNIT_VMUL | UNIT_SMUL)
+#define UNITS_ADD (UNIT_VADD | UNIT_SADD)
+#define UNITS_ALL (UNITS_MUL | UNITS_ADD | UNIT_VLUT)
+#define UNITS_SCALAR (UNIT_SADD | UNIT_SMUL)
+#define UNITS_VECTOR (UNIT_VMUL | UNIT_VADD | UNIT_VLUT)
 
-ADD, f2i
-ADD, f2u
-ADD, i2f
-ADD, u2f
+static int alu_opcode_unit[256] = {
+	[midgard_alu_op_fadd]		 = UNITS_ADD,
+	[midgard_alu_op_fmul]		 = UNITS_MUL | UNIT_VLUT,
+	[midgard_alu_op_fmin]		 = UNITS_ALL,
+	[midgard_alu_op_fmax]		 = UNITS_ALL,
+	[midgard_alu_op_imin]		 = UNITS_ALL,
+	[midgard_alu_op_imax]		 = UNITS_ALL,
+	[midgard_alu_op_fmov]		 = UNITS_ALL,
+	[midgard_alu_op_ffloor]		 = UNITS_ADD,
+	[midgard_alu_op_fceil]		 = UNITS_ADD,
 
-LUT, fsin
-LUT, fcos
+	/* Though they output a scalar, they need to run on a vector unit
+	 * since they process vectors */
+	[midgard_alu_op_fdot3]		 = UNITS_VECTOR,
+	[midgard_alu_op_fdot4]		 = UNITS_VECTOR,
 
-ADD, iand
-ADD, ior
-ADD, ixor
-MUL, inot
-ADD, ishl
-ADD, iasr
-ADD, ilsr
-ADD, ilsr
+	[midgard_alu_op_iadd]		 = UNITS_ADD,
+	[midgard_alu_op_isub]		 = UNITS_ADD,
+	[midgard_alu_op_imul]		 = UNITS_ALL,
+	[midgard_alu_op_imov]		 = UNITS_ALL,
 
-MUL, fball_eq
-MUL, fbany_neq
-MUL, iball_eq
-MUL, ibany_neq
-#endif
+	[midgard_alu_op_feq]		 = UNITS_ALL,
+	[midgard_alu_op_fne]		 = UNITS_ALL,
+	[midgard_alu_op_flt]		 = UNITS_ADD,
+	[midgard_alu_op_ieq]		 = UNITS_ALL,
+	[midgard_alu_op_ine]		 = UNITS_ALL,
+	[midgard_alu_op_ilt]		 = UNITS_ALL,
+	[midgard_alu_op_icsel]		 = UNITS_ADD,
+
+	[midgard_alu_op_frcp]		 = UNIT_VLUT,
+	[midgard_alu_op_frsqrt]		 = UNIT_VLUT,
+	[midgard_alu_op_fsqrt]		 = UNIT_VLUT,
+	[midgard_alu_op_fexp2]		 = UNIT_VLUT,
+	[midgard_alu_op_flog2]		 = UNIT_VLUT,
+
+	[midgard_alu_op_f2i]		 = UNITS_ADD,
+	[midgard_alu_op_f2u]		 = UNITS_ADD,
+	[midgard_alu_op_i2f]		 = UNITS_ADD,
+	[midgard_alu_op_u2f]		 = UNITS_ADD,
+
+	[midgard_alu_op_fsin]		 = UNIT_VLUT,
+	[midgard_alu_op_fcos]		 = UNIT_VLUT,
+
+	[midgard_alu_op_iand]		 = UNITS_ADD,
+	[midgard_alu_op_ior]		 = UNITS_ADD,
+	[midgard_alu_op_ixor]		 = UNITS_ADD,
+	[midgard_alu_op_inot]		 = UNITS_ALL,
+	[midgard_alu_op_ishl]		 = UNITS_ADD,
+	[midgard_alu_op_iasr]		 = UNITS_ADD,
+	[midgard_alu_op_ilsr]		 = UNITS_ADD,
+	[midgard_alu_op_ilsr]		 = UNITS_ADD,
+
+	[midgard_alu_op_fball_eq]	 = UNITS_ALL,
+	[midgard_alu_op_fbany_neq]	 = UNITS_ALL,
+	[midgard_alu_op_iball_eq]	 = UNITS_ALL,
+	[midgard_alu_op_ibany_neq]	 = UNITS_ALL
+};
