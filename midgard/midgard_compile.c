@@ -2089,8 +2089,6 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 			/* Finally, register allocation! Must be done after everything else */
 			allocate_registers(ctx);
-
-			break; /* TODO: Multi-block shaders */
 		}
 
 		break; /* TODO: Multi-function shaders */
@@ -2128,7 +2126,6 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	 * be assigned easily */
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
-
 		util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
 			if (!ins->unused) {
 				util_dynarray_append(&tags, int, compiled->size);
