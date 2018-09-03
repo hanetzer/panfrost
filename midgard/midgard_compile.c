@@ -66,6 +66,19 @@ typedef struct {
 	bool inline_constant;
 } ssa_args;
 
+/* Forward declare so midgard_branch can reference */
+struct midgard_block;
+
+typedef struct midgard_branch {
+	/* If conditional, the condition is specified in r31.w */
+	bool conditional;
+	
+	/* For conditionals, if this is true, we branch on FALSE. If false, we  branch on TRUE. */
+	bool invert_conditional;
+
+	struct midgard_block *target;
+} midgard_branch;
+
 /* Generic in-memory data type repesenting a single logical instruction, rather
  * than a single instruction group. This is the preferred form for code gen.
  * Multiple midgard_insturctions will later be combined during scheduling,
@@ -106,6 +119,10 @@ typedef struct midgard_instruction {
 		midgard_vector_alu alu;
 		midgard_texture_word texture;
 		uint16_t br_compact;
+
+		/* General branch, rather than packed br_compact. Higher level
+		 * than the other components */
+		midgard_branch branch;
 	};
 } midgard_instruction;
 
@@ -253,6 +270,22 @@ v_alu_br_compact_cond(midgard_jmp_writeout_op op, unsigned tag, signed offset, u
 
 		.compact_branch = true, 
 		.br_compact = compact
+	};
+
+	return ins;
+}
+
+static midgard_instruction
+v_branch(struct midgard_block *target, bool conditional, bool invert)
+{
+	midgard_instruction ins = {
+		.type = TAG_ALU_4,
+		.unit = ALU_ENAB_BRANCH,
+		.branch = {
+			.target = target,
+			.conditional = conditional,
+			.invert_conditional = invert
+		}
 	};
 
 	return ins;
@@ -2070,8 +2103,17 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	midgard_block *then_block = emit_cf_list(ctx, &nif->then_list);
 	midgard_block *else_block = emit_cf_list(ctx, &nif->else_list);
 
+	/* Now that we have the subblocks emitted, emit a branch to them */
+
 	assert(then_block);
 	assert(else_block);
+
+	/* TODO: Only emit one branch (fallthrough to then) */
+	EMIT(branch, then_block, true, false);
+	EMIT(branch, else_block, true, true);
+
+	/* TODO: Emit branch at the end of then_block */
+	/* TODO: Fallthrough else */
 }
 
 static void
@@ -2201,6 +2243,33 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 		util_dynarray_append(&tags, int, compiled->size);
 		util_dynarray_append(compiled, midgard_load_store, instruction);
+	}
+
+	/* Now that all the blocks are emitted and we can calculate their
+	 * sizes, emit actual branch instructions rather than placeholders */
+
+	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
+			if (ins->unused) continue;
+			if (ins->unit != ALU_ENAB_BRANCH) continue;
+
+			assert(ins->branch.conditional);
+
+			midgard_branch_cond branch = {
+				.op = midgard_jmp_writeout_op_branch_cond,
+				.dest_tag = 0, /* TODO */
+				.offset = 0, /* TODO */
+				.cond = ins->branch.invert_conditional ? 1 : 2
+			};
+
+			uint16_t compact;
+			memcpy(&compact, &branch, sizeof(branch));
+
+			/* Swap in the generic branch for our actual branch */
+			ins->unit = ALU_ENAB_BR_COMPACT;
+			ins->compact_branch = true;
+			ins->br_compact = compact;
+		}
 	}
 
 	/* Emit flat binary from the instruction arrays. Iterate each block in
