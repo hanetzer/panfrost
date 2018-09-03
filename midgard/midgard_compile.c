@@ -2136,7 +2136,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		ctx->func = func;
 
 		emit_cf_list(ctx, &func->impl->body);
-		//emit_block(ctx, func->impl->end_block);
+		emit_block(ctx, func->impl->end_block);
 
 		break; /* TODO: Multi-function shaders */
 	}
@@ -2180,28 +2180,28 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			}
 		}
 
-		/* Now just perform lookahead */
-		util_dynarray_foreach(&tags, int, tag) {
-			int lookahead;
+		util_dynarray_fini(block);
+	}
 
-			uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
+	/* Now just perform lookahead */
+	util_dynarray_foreach(&tags, int, tag) {
+		int lookahead;
 
-			if (IN_ARRAY(tag + 1, &tags)) {
-				uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
+		uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
 
-				if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
-					lookahead = 1;
-				} else {
-					lookahead = *next;
-				}
-			} else {
+		if (IN_ARRAY(tag + 1, &tags)) {
+			uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
+
+			if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
 				lookahead = 1;
+			} else {
+				lookahead = *next;
 			}
-
-			*ins |= lookahead << 4;
+		} else {
+			lookahead = 1;
 		}
 
-		util_dynarray_fini(block);
+		*ins |= lookahead << 4;
 	}
 
 	/* TODO: Propagate compiled code up correctly */
