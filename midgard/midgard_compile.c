@@ -112,7 +112,7 @@ typedef struct midgard_instruction {
 /* Helpers to generate midgard_instruction's using macro magic, since every
  * driver seems to do it that way */
 
-#define EMIT(op, ...) util_dynarray_append(&(ctx->current_block), midgard_instruction, v_##op(__VA_ARGS__));
+#define EMIT(op, ...) util_dynarray_append((ctx->current_block), midgard_instruction, v_##op(__VA_ARGS__));
 
 #define M_LOAD_STORE(name, rname, uname) \
 	static midgard_instruction m_##name(unsigned ssa, unsigned address) { \
@@ -265,11 +265,18 @@ attach_constants(midgard_instruction *ins, void *constants)
 	memcpy(&ins->constants, constants, 16); /* TODO: How big? */
 }
 
+typedef struct midgard_block {
+	/* List of midgard_instructions emitted for the current block */
+	struct util_dynarray instructions;
+} midgard_block;
+
 typedef struct compiler_context {
 	gl_shader_stage stage;
 
+	midgard_block *initial_block;
+
 	/* List of midgard_instructions emitted for the current block */
-	struct util_dynarray current_block;
+	struct util_dynarray *current_block;
 
 	/* Constants which have been loaded, for later inlining */
 	struct hash_table_u64 *ssa_constants;
@@ -551,7 +558,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			midgard_instruction ins = v_fmov(condition, alu_src, 31, true, midgard_outmod_none);
 			ins.alu.mask = 0x3 << 6; /* mask out w */
 
-			util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
+			util_dynarray_append((ctx->current_block), midgard_instruction, ins);
 			//alias_ssa(ctx, instr->src[0].src.ssa->index, SSA_FIXED_REGISTER(31), true);
 
 			memmove(instr->src, instr->src + 1, 2 * sizeof(nir_alu_src));
@@ -571,7 +578,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 				midgard_instruction ins = v_fmov(nir_src_index(&asrc->src), src, dest, false, midgard_outmod_none);
 				ins.alu.mask = 0x3 << (2 * i);
 
-				util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
+				util_dynarray_append((ctx->current_block), midgard_instruction, ins);
 			}
 
 			return;
@@ -665,10 +672,10 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 				nirmod0->swizzle[j] = original_swizzle[i]; /* Pull from the correct component */
 
 			ins.alu.src1 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod0));
-			util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+			util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 		}
 	} else {
-		util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+		util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 	}
 }
 
@@ -709,7 +716,7 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 				ins.load_store.is_varying = 1;
 				ins.load_store.interpolation = midgard_interp_default;
 				ins.load_store.unknown = 0x1E9E; /* XXX: What is this? */
-				util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+				util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 			} else if (ctx->stage == MESA_SHADER_VERTEX) {
 				midgard_instruction ins = m_load_attr_32(reg, offset);
 				ins.load_store.unknown = 0x1E1E; /* XXX: What is this? */
@@ -723,7 +730,7 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 					ins.load_store.swizzle = SWIZZLE(COMPONENT_X, COMPONENT_Y, COMPONENT_Z, COMPONENT_X);
 				}
 
-				util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+				util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 			} else {
 				printf("Unknown load\n");
 			}
@@ -775,7 +782,7 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 				midgard_instruction ins = m_store_vary_32(high_varying_register, offset);
 				ins.load_store.unknown = 0x1E9E; /* XXX: What is this? */
 				ins.uses_ssa = false;
-				util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+				util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 			} else {
 				printf("Unknown store\n");
 			}
@@ -830,7 +837,7 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 				alu_src.swizzle = (COMPONENT_Y << 2);
 
 				midgard_instruction ins = v_fmov(index, alu_src, REGISTER_TEXTURE_BASE, true, midgard_outmod_none);
-				util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
+				util_dynarray_append((ctx->current_block), midgard_instruction, ins);
 
 				break;
 			}
@@ -883,7 +890,7 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 		ins.texture.in_reg_swizzle_third = COMPONENT_X;
 	}
 
-	util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
+	util_dynarray_append(ctx->current_block, midgard_instruction, ins);
 
 	/* Emit a move for the destination as well TODO eliminate */
 	
@@ -929,7 +936,7 @@ emit_instr(compiler_context *ctx, struct nir_instr *instr)
 /* XXX: This has really awful asymptomatic complexity. Fix it or switch to
  * anholt's RA or something */
 
-#define IN_ARRAY(n, arr) (n < (((char *) arr.data) + arr.size))
+#define IN_ARRAY(n, arr) (n < (((char *) ((arr)->data)) + ((arr)->size)))
 
 static bool
 is_ssa_used_later(compiler_context *ctx, midgard_instruction *ins, int ssa)
@@ -1011,7 +1018,7 @@ dealias_register(compiler_context *ctx, midgard_instruction *ins, int reg, bool 
 static void
 allocate_registers(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		if (ins->unused) continue;
 
 		ssa_args args = ins->ssa_args;
@@ -1569,7 +1576,7 @@ skip_instruction:
 static void
 inline_alu_constants(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, alu) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, alu) {
 		/* Other instructions cannot inline constants */
 		if (alu->type != TAG_ALU_4) continue;
 
@@ -1591,7 +1598,7 @@ inline_alu_constants(compiler_context *ctx)
 static void
 eliminate_varying_mov(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, move) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, move) {
 		/* Only interest ourselves with fmov instructions */
 		
 		if (move->type != TAG_ALU_4) continue;
@@ -1605,7 +1612,7 @@ eliminate_varying_mov(compiler_context *ctx)
 
 		bool used = false;
 
-		for (midgard_instruction *candidate = ctx->current_block.data;
+		for (midgard_instruction *candidate = ctx->current_block->data;
 		     IN_ARRAY(candidate, ctx->current_block);
 		     candidate += 1) {
 			/* If not using SSA, the sources are meaningless here */
@@ -1628,7 +1635,7 @@ eliminate_varying_mov(compiler_context *ctx)
 
 		if (!used) {
 			for (midgard_instruction *candidate = (move - 1);
-			     candidate >= ctx->current_block.data;
+			     candidate >= ctx->current_block->data;
 			     candidate -= 1) {
 				if (!candidate->uses_ssa) continue;
 
@@ -1652,7 +1659,7 @@ eliminate_varying_mov(compiler_context *ctx)
 static void
 embedded_to_inline_constant(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		if (!ins->has_constants) continue;
 		if (ins->ssa_args.inline_constant) continue;
 		if (ins->unused) continue;
@@ -1815,7 +1822,7 @@ emit_leftover_move(compiler_context *ctx)
 static void
 actualise_ssa_to_alias(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		if (!ins->uses_ssa) continue;
 
 		map_ssa_to_alias(ctx, &ins->ssa_args.src0);
@@ -1830,7 +1837,7 @@ actualise_ssa_to_alias(compiler_context *ctx)
 static void
 actualise_register_to_ssa(compiler_context *ctx)
 {
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		uintptr_t reg = (uintptr_t) _mesa_hash_table_u64_search(ctx->register_to_ssa, ins->ssa_args.dest + 1);
 
 		if (reg) {
@@ -2033,7 +2040,12 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			continue;
 
 		nir_foreach_block(block, func->impl) {
-			util_dynarray_init(&ctx->current_block, NULL);
+			midgard_block this_block;
+
+			/* Set up current block */
+			util_dynarray_init(&this_block.instructions, NULL);
+			ctx->current_block = &this_block.instructions;
+
 			ctx->ssa_constants = _mesa_hash_table_u64_create(NULL); 
 			ctx->ssa_to_alias = _mesa_hash_table_u64_create(NULL); 
 			ctx->register_to_ssa = _mesa_hash_table_u64_create(NULL); 
@@ -2076,7 +2088,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 	int first_tag = 0;
 
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		if (!ins->unused) {
 			first_tag = ins->type;
 			break;
@@ -2095,7 +2107,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	}
 
 	/* Emit flat binary from the instruction array. Save instruction boundaries such that lookahead tags can be assigned easily */
-	util_dynarray_foreach(&ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
 		if (!ins->unused) {
 			util_dynarray_append(&tags, int, compiled->size);
 			ins += emit_binary_instruction(ctx, ins, compiled);
@@ -2108,10 +2120,10 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 		uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
 
-		if (IN_ARRAY(tag + 1, tags)) {
+		if (IN_ARRAY(tag + 1, &tags)) {
 			uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
 
-			if (!IN_ARRAY(tag + 2, tags) && IS_ALU(*next)) {
+			if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
 				lookahead = 1;
 			} else {
 				lookahead = *next;
@@ -2123,7 +2135,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		*ins |= lookahead << 4;
 	}
 
-	util_dynarray_fini(&ctx->current_block);
+	util_dynarray_fini(ctx->current_block);
 
 	/* TODO: Propagate compiled code up correctly */
 	return 0;
