@@ -302,6 +302,8 @@ attach_constants(midgard_instruction *ins, void *constants)
 typedef struct midgard_block {
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray instructions;
+
+	struct midgard_block *next_fallthrough;
 } midgard_block;
 
 typedef struct compiler_context {
@@ -314,6 +316,7 @@ typedef struct compiler_context {
 	struct util_dynarray blocks;
 
 	midgard_block *initial_block;
+	midgard_block *previous_source_block;
 	midgard_block *final_block;
 
 	/* List of midgard_instructions emitted for the current block */
@@ -2066,6 +2069,9 @@ emit_block(compiler_context *ctx, nir_block *block)
 		if (block == nir_impl_last_block(ctx->func->impl))
 			emit_fragment_epilogue(ctx);
 
+	/* Fallthrough save */
+	this_block.next_fallthrough = ctx->previous_source_block;
+
 	/* Save the block. Initial and final may be the same. */
 	util_dynarray_append(&ctx->blocks, midgard_block, this_block);
 
@@ -2080,6 +2086,9 @@ emit_block(compiler_context *ctx, nir_block *block)
 	/* Allow the next control flow to access us retroactively, for
 	 * branching etc */
 	ctx->current_block = &block_ptr->instructions;
+	
+	/* Document the fallthrough chain */
+	ctx->previous_source_block = block_ptr;
 
 	/* Finally, register allocation! Must be done after everything else */
 	allocate_registers(ctx);
@@ -2258,10 +2267,24 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 			uint16_t compact;
 
+			/* Determine the block we're jumping to */
+			midgard_block *target = ins->branch.target_start;
+
+			if (!target)
+				target = ins->branch.target_after->next_fallthrough;
+
+			assert(target);
+
+			/* Determine the destination tag */
+			midgard_instruction *first = util_dynarray_element(&target->instructions, midgard_instruction, 0);
+
+			int dest_tag = first->type;
+			printf("Dest tag: %X\n", dest_tag);
+
 			if (ins->branch.conditional) {
 				midgard_branch_cond branch = {
 					.op = midgard_jmp_writeout_op_branch_cond,
-					.dest_tag = 0, /* TODO */
+					.dest_tag = dest_tag, /* TODO */
 					.offset = 0, /* TODO */
 					.cond = ins->branch.invert_conditional ? 1 : 2
 				};
@@ -2270,8 +2293,9 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			} else {
 				midgard_branch_uncond branch = {
 					.op = midgard_jmp_writeout_op_branch_uncond,
-					.dest_tag = 0, /* TODO */
+					.dest_tag = dest_tag, /* TODO */
 					.offset = 0, /* TODO */
+					.unknown = 1
 				};
 
 				memcpy(&compact, &branch, sizeof(branch));
