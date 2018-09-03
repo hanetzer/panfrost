@@ -2136,7 +2136,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		ctx->func = func;
 
 		emit_cf_list(ctx, &func->impl->body);
-		emit_block(ctx, func->impl->end_block);
+		//emit_block(ctx, func->impl->end_block);
 
 		break; /* TODO: Multi-function shaders */
 	}
