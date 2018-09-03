@@ -1117,7 +1117,7 @@ vector_to_scalar_source(unsigned u)
 		.abs = v.abs,
 		.negate = v.negate,
 		.full = !v.half,
-		.component = v.swizzle & 3
+		.component = (v.swizzle & 3) << 1
 	};
 
 	unsigned o;
@@ -1137,7 +1137,7 @@ vector_to_scalar_alu(midgard_vector_alu v)
 		.unknown = 0,
 		.outmod = v.outmod,
 		.output_full = 1, /* TODO: Half */
-		.output_component = component_from_mask(v.mask),
+		.output_component = component_from_mask(v.mask) << 1,
 	};
 
 	return s;
