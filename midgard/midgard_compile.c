@@ -837,7 +837,12 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 			case nir_tex_src_coord: {
 				int index = nir_src_index(&instr->src[i].src);
 				/* TODO: Also use other texture reg? */
-				alias_ssa(ctx, REGISTER_TEXTURE_BASE, index, true);
+
+				midgard_vector_alu_src alu_src = blank_alu_src;
+				alu_src.swizzle = (COMPONENT_Y << 2);
+
+				midgard_instruction ins = v_fmov(index, alu_src, REGISTER_TEXTURE_BASE, true, midgard_outmod_none);
+				util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
 
 				break;
 			}
