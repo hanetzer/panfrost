@@ -273,6 +273,9 @@ typedef struct midgard_block {
 typedef struct compiler_context {
 	gl_shader_stage stage;
 
+	/* Current NIR function */
+	nir_function *func;
+
 	/* Unordered array of midgard_block */
 	struct util_dynarray blocks;
 
@@ -1987,7 +1990,7 @@ emit_fragment_epilogue(compiler_context *ctx)
 }
 
 static void
-emit_block(compiler_context *ctx, nir_function *func, nir_block *block)
+emit_block(compiler_context *ctx, nir_block *block)
 {
 	midgard_block this_block;
 
@@ -2016,7 +2019,7 @@ emit_block(compiler_context *ctx, nir_function *func, nir_block *block)
 
 	/* Append fragment shader epilogue (value writeout) */
 	if (ctx->stage == MESA_SHADER_FRAGMENT)
-		if (block == nir_impl_last_block(func->impl))
+		if (block == nir_impl_last_block(ctx->func->impl))
 			emit_fragment_epilogue(ctx);
 
 	/* Save the block. Initial and final may be the same. */
@@ -2024,15 +2027,52 @@ emit_block(compiler_context *ctx, nir_function *func, nir_block *block)
 
 	midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
 
-	if (block == nir_start_block(func->impl))
+	if (block == nir_start_block(ctx->func->impl))
 		ctx->initial_block = block_ptr;
 
-	if (block == nir_impl_last_block(func->impl))
+	if (block == nir_impl_last_block(ctx->func->impl))
 		ctx->final_block = block_ptr;
 
 	/* Finally, register allocation! Must be done after everything else */
 	allocate_registers(ctx);
 
+}
+
+static void emit_cf_list(struct compiler_context *ctx, struct exec_list *list);
+
+static void
+emit_if(struct compiler_context *ctx, nir_if *nif)
+{
+	/* TODO: Do something with the condition */
+	emit_cf_list(ctx, &nif->then_list);
+	emit_cf_list(ctx, &nif->else_list);
+}
+
+static void
+emit_loop(struct compiler_context *ctx, nir_loop *nloop)
+{
+	emit_cf_list(ctx, &nloop->body);
+}
+
+static void
+emit_cf_list(struct compiler_context *ctx, struct exec_list *list)
+{
+	foreach_list_typed(nir_cf_node, node, node, list) {
+		switch (node->type) {
+		case nir_cf_node_block:
+			emit_block(ctx, nir_cf_node_as_block(node));
+			break;
+		case nir_cf_node_if:
+			emit_if(ctx, nir_cf_node_as_if(node));
+			break;
+		case nir_cf_node_loop:
+			emit_loop(ctx, nir_cf_node_as_loop(node));
+			break;
+		case nir_cf_node_function:
+			assert(0);
+			break;
+		}
+	}
 }
 
 int
@@ -2093,10 +2133,10 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			continue;
 
 		util_dynarray_init(&ctx->blocks, NULL);
+		ctx->func = func;
 
-		nir_foreach_block(block, func->impl) {
-			emit_block(ctx, func, block);
-		}
+		emit_cf_list(ctx, &func->impl->body);
+		emit_block(ctx, func->impl->end_block);
 
 		break; /* TODO: Multi-function shaders */
 	}
