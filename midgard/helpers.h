@@ -146,12 +146,14 @@ midgard_is_integer_op(int op)
 #define UNIT_SMUL ALU_ENAB_SCAL_MUL
 #define UNIT_VLUT ALU_ENAB_VEC_LUT
 
-/* Shorthands for usual combinations of units */
+/* Shorthands for usual combinations of units. LUT is intentionally included
+ * since it's nutty. */
+
 #define UNITS_MUL (UNIT_VMUL | UNIT_SMUL)
 #define UNITS_ADD (UNIT_VADD | UNIT_SADD)
-#define UNITS_ALL (UNITS_MUL | UNITS_ADD | UNIT_VLUT)
+#define UNITS_ALL (UNITS_MUL | UNITS_ADD)
 #define UNITS_SCALAR (UNIT_SADD | UNIT_SMUL)
-#define UNITS_VECTOR (UNIT_VMUL | UNIT_VADD | UNIT_VLUT)
+#define UNITS_VECTOR (UNIT_VMUL | UNIT_VADD)
 
 static int alu_opcode_unit[256] = {
 	[midgard_alu_op_fadd]		 = UNITS_ADD,
@@ -180,7 +182,9 @@ static int alu_opcode_unit[256] = {
 	[midgard_alu_op_ieq]		 = UNITS_ALL,
 	[midgard_alu_op_ine]		 = UNITS_ALL,
 	[midgard_alu_op_ilt]		 = UNITS_ALL,
+
 	[midgard_alu_op_icsel]		 = UNITS_ADD,
+	[midgard_alu_op_fcsel]		 = UNITS_ADD,
 
 	[midgard_alu_op_frcp]		 = UNIT_VLUT,
 	[midgard_alu_op_frsqrt]		 = UNIT_VLUT,

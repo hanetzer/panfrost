@@ -418,24 +418,6 @@ emit_load_const(compiler_context *ctx, nir_load_const_instr *instr)
 	_mesa_hash_table_u64_insert(ctx->ssa_constants, def.index + 1, v);
 }
 
-static unsigned
-unit_enum_to_midgard(int unit_enum, int is_vector) {
-	if (is_vector) {
-		switch(unit_enum) {
-			case UNIT_MUL: return ALU_ENAB_VEC_MUL;
-			case UNIT_ADD: return ALU_ENAB_VEC_ADD;
-			case UNIT_LUT: return ALU_ENAB_VEC_LUT;
-			default: return 0; /* Should never happen */
-		}
-	} else {
-		switch(unit_enum) {
-			case UNIT_MUL: return ALU_ENAB_SCAL_MUL;
-			case UNIT_ADD: return ALU_ENAB_SCAL_ADD;
-			default: return 0; /* Should never happen */
-		}
-	}
-}
-
 /* Duplicate bits to convert sane 4-bit writemask to obscure 8-bit format */
 
 static unsigned
@@ -474,8 +456,7 @@ nir_alu_src_index(nir_alu_src *src)
 	return nir_src_index(&src->src);
 }
 
-/* Unit: shorthand for the unit used by this instruction (MUL, ADD, LUT).
- * Components: Number/style of arguments:
+/* Components: Number/style of arguments:
  * 	3: One-argument op with r24 (i2f, f2i)
  * 	2: Standard two argument op (fadd, fmul)
  * 	1: Flipped one-argument op (fmov, imov)
@@ -484,9 +465,8 @@ nir_alu_src_index(nir_alu_src *src)
  * Op: Midgard instruction op.
  */
 
-#define ALU_CASE(_unit, _components, nir, _op) \
+#define ALU_CASE(_components, nir, _op) \
 	case nir_op_##nir: \
-		unit = UNIT_##_unit; \
 		components = _components; \
 		op = midgard_alu_op_##_op; \
 		break;
@@ -515,66 +495,65 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 	unsigned op, unit, components;
 
 	switch(instr->op) {
-		ALU_CASE(ADD, 2, fadd, fadd);
-		ALU_CASE(MUL, 2, fmul, fmul);
-		ALU_CASE(MUL, 2, fmin, fmin);
-		ALU_CASE(MUL, 2, fmax, fmax);
-		ALU_CASE(MUL, 2, imin, imin);
-		ALU_CASE(MUL, 2, imax, imax);
-		ALU_CASE(MUL, 1, fmov, fmov);
-		ALU_CASE(ADD, 0, ffloor, ffloor);
-		ALU_CASE(ADD, 0, fceil, fceil);
-		ALU_CASE(MUL, 2, fdot3, fdot3);
-		//ALU_CASE(MUL, 2, fdot3r);
-		ALU_CASE(MUL, 2, fdot4, fdot4);
-		//ALU_CASE(MUL, 2, freduce);
-		ALU_CASE(ADD, 2, iadd, iadd);
-		ALU_CASE(ADD, 2, isub, isub);
-		ALU_CASE(MUL, 2, imul, imul);
-		ALU_CASE(MUL, 1, imov, imov);
+		ALU_CASE(2, fadd, fadd);
+		ALU_CASE(2, fmul, fmul);
+		ALU_CASE(2, fmin, fmin);
+		ALU_CASE(2, fmax, fmax);
+		ALU_CASE(2, imin, imin);
+		ALU_CASE(2, imax, imax);
+		ALU_CASE(1, fmov, fmov);
+		ALU_CASE(0, ffloor, ffloor);
+		ALU_CASE(0, fceil, fceil);
+		ALU_CASE(2, fdot3, fdot3);
+		//ALU_CASE(2, fdot3r);
+		ALU_CASE(2, fdot4, fdot4);
+		//ALU_CASE(2, freduce);
+		ALU_CASE(2, iadd, iadd);
+		ALU_CASE(2, isub, isub);
+		ALU_CASE(2, imul, imul);
+		ALU_CASE(1, imov, imov);
 
-		ALU_CASE(MUL, 2, feq, feq);
-		ALU_CASE(MUL, 2, fne, fne);
-		ALU_CASE(ADD, 2, flt, flt);
-		//ALU_CASE(MUL, 2, fle);
-		ALU_CASE(MUL, 2, ieq, ieq);
-		ALU_CASE(MUL, 2, ine, ine);
-		ALU_CASE(MUL, 2, ilt, ilt);
-		//ALU_CASE(MUL, 2, ile);
-		//ALU_CASE(ADD, 2, icsel, icsel);
-		//ALU_CASE(LUT, 0, fatan_pt2);
-		ALU_CASE(LUT, 0, frcp, frcp);
-		ALU_CASE(LUT, 0, frsq, frsqrt);
-		ALU_CASE(LUT, 0, fsqrt, fsqrt);
-		ALU_CASE(LUT, 0, fexp2, fexp2);
-		ALU_CASE(LUT, 0, flog2, flog2);
+		ALU_CASE(2, feq, feq);
+		ALU_CASE(2, fne, fne);
+		ALU_CASE(2, flt, flt);
+		//ALU_CASE(2, fle);
+		ALU_CASE(2, ieq, ieq);
+		ALU_CASE(2, ine, ine);
+		ALU_CASE(2, ilt, ilt);
+		//ALU_CASE(2, ile);
+		//ALU_CASE(2, icsel, icsel);
+		//ALU_CASE(0, fatan_pt2);
+		ALU_CASE(0, frcp, frcp);
+		ALU_CASE(0, frsq, frsqrt);
+		ALU_CASE(0, fsqrt, fsqrt);
+		ALU_CASE(0, fexp2, fexp2);
+		ALU_CASE(0, flog2, flog2);
 
-		ALU_CASE(ADD, 3, f2i32, f2i);
-		ALU_CASE(ADD, 3, f2u32, f2u);
-		ALU_CASE(ADD, 3, i2f32, i2f);
-		ALU_CASE(ADD, 3, u2f32, u2f);
+		ALU_CASE(3, f2i32, f2i);
+		ALU_CASE(3, f2u32, f2u);
+		ALU_CASE(3, i2f32, i2f);
+		ALU_CASE(3, u2f32, u2f);
 
-		ALU_CASE(LUT, 0, fsin, fsin);
-		ALU_CASE(LUT, 0, fcos, fcos);
+		ALU_CASE(0, fsin, fsin);
+		ALU_CASE(0, fcos, fcos);
 
-		//ALU_CASE(LUT, 0, fatan_pt1);
+		//ALU_CASE(0, fatan_pt1);
 
-		ALU_CASE(ADD, 2, iand, iand);
-		ALU_CASE(ADD, 2, ior, ior);
-		ALU_CASE(ADD, 2, ixor, ixor);
-		ALU_CASE(MUL, 0, inot, inot);
-		ALU_CASE(ADD, 2, ishl, ishl);
-		ALU_CASE(ADD, 2, ishr, iasr);
-		ALU_CASE(ADD, 2, ushr, ilsr);
-		//ALU_CASE(ADD, 2, ilsr, ilsr);
+		ALU_CASE(2, iand, iand);
+		ALU_CASE(2, ior, ior);
+		ALU_CASE(2, ixor, ixor);
+		ALU_CASE(0, inot, inot);
+		ALU_CASE(2, ishl, ishl);
+		ALU_CASE(2, ishr, iasr);
+		ALU_CASE(2, ushr, ilsr);
+		//ALU_CASE(2, ilsr, ilsr);
 
-		ALU_CASE(MUL, 2, ball_fequal4, fball_eq);
-		ALU_CASE(MUL, 2, bany_fnequal4, fbany_neq);
-		ALU_CASE(MUL, 2, ball_iequal4, iball_eq);
-		ALU_CASE(MUL, 2, bany_inequal4, ibany_neq);
+		ALU_CASE(2, ball_fequal4, fball_eq);
+		ALU_CASE(2, bany_fnequal4, fbany_neq);
+		ALU_CASE(2, ball_iequal4, iball_eq);
+		ALU_CASE(2, bany_inequal4, ibany_neq);
 
 		case nir_op_bcsel: {
-			unit = UNIT_ADD;
 			components = 2;
 			op = midgard_alu_op_fcsel;
 
@@ -603,43 +582,19 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			return;
 	}
 
+	int _unit = alu_opcode_unit[op];
+
 	/* slut doesn't exist; lower to vlut which acts as scalar
 	 * despite the name */
 
-	if (unit == UNIT_LUT)
+	if (_unit == UNIT_VLUT)
 		is_vector = true;
 
-	/* Certain ops (dot products, etc) write out to a single component but
-	 * require vector; force this */
+	/* Certain ops cannot run as scalars */
+	if (!(_unit & UNITS_SCALAR))
+		is_vector = true;
 
-	switch(instr->op) {
-		case nir_op_fdot3:
-		case nir_op_fdot4:
-			is_vector = true;
-
-		default:
-			break;
-	}
-
-	/* To aid scheduling, make sure that we use the earliest pipeline stage
-	 * possible for the instruction. This means VMUL for vectors and SADD
-	 * for scalars, if that's possible. MUL is already the default, but
-	 * scalars need to be transferred */
-
-	if (!is_vector && unit == UNIT_MUL) {
-		switch (instr->op) {
-			/* The following ops require a multiplier and therefore
-			 * cannot be transferred */
-
-			case midgard_alu_op_fmul:
-				break;
-
-			default:
-				/* TODO: XXX: FIGURE OUT WHY THIS BREAKS */
-				//unit = UNIT_ADD;
-				break;
-		}
-	}
+	printf("EMITTING %X\n", op);
 
 	/* Initialise fields common between scalar/vector instructions */
 	midgard_outmod outmod = instr->dest.saturate ? midgard_outmod_sat : midgard_outmod_none;
@@ -656,7 +611,6 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 
 	midgard_instruction ins = {
 		.type = TAG_ALU_4,
-		.unit = unit_enum_to_midgard(unit, is_vector),
 		.unused = false,
 		.uses_ssa = true,
 		.ssa_args = {
@@ -711,7 +665,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 		ins.scalar_alu = alu;
 	}
 
-	if (unit == UNIT_LUT) {
+	if (_unit == UNIT_VLUT) {
 		/* To avoid duplicating the LUTs (we think?), LUT instructions can only
 		 * operate as if they were scalars. Lower them here by changing the
 		 * component. */
@@ -1227,61 +1181,54 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 				 * TODO: Allow for parallelism!!!
 				 */
 
-				if (last_unit >= ALU_ENAB_VEC_ADD && ains->unit >= ALU_ENAB_VEC_ADD)
-					break;
+				/* Pick a unit for it if it doesn't force a particular unit */
 
-				if (last_unit && last_unit < ALU_ENAB_VEC_ADD && ains->unit < ALU_ENAB_VEC_ADD) {
-					/* It may be possible to switch the
-					 * unit of the instruction to enable
-					 * pipelined fake VLIW. If so, handle
-					 * that here. If not, we have to break
-					 * the batch. */
-
+				if (!ains->unit) {
 					int op = ains->vector ? ains->vector_alu.op : ains->scalar_alu.op;
-					bool break_batch = false;
+					int units = alu_opcode_unit[op];
 
-					switch (op) {
-						/* The following ops work on
-						 * either adders or multiplers,
-						 * and are migrated
-						 * appropriately for
-						 * vector/scalar */
-
-						case midgard_alu_op_fmov: 
-						case midgard_alu_op_ffloor: 
-						case midgard_alu_op_fceil: 
-						case midgard_alu_op_fmin: 
-						case midgard_alu_op_fmax: 
-						case midgard_alu_op_feq: 
-						case midgard_alu_op_ieq: 
-						case midgard_alu_op_ine: 
-						case midgard_alu_op_fne: 
-						case midgard_alu_op_flt: 
-						case midgard_alu_op_fle: 
-						case midgard_alu_op_ilt: 
-						case midgard_alu_op_ile: 
-						case midgard_alu_op_imin:
-						case midgard_alu_op_imax:
-							ains->unit = ains->vector ? ALU_ENAB_VEC_ADD : ALU_ENAB_SCAL_MUL;
-							break;
-						case midgard_alu_op_fmul:
-							/* LUT doubles as an extra multiplier */
-							if (ains->vector)
-								ains->unit = unit_enum_to_midgard(UNIT_LUT, ains->vector);
+					if (ains->vector) {
+						if (last_unit >= UNIT_VADD) {
+							if (units & UNIT_VADD)
+								ains->unit = UNIT_VADD;
+							else if (units & UNIT_VLUT)
+								ains->unit = UNIT_VLUT;
 							else
-								break_batch = true;
-							break;
-						default:
-							break_batch = true;
-							break;
+								break;
+						} else {
+							if (units & UNIT_VMUL)
+								ains->unit = UNIT_VMUL;
+							else if (units & UNIT_VADD)
+								ains->unit = UNIT_VADD;
+							else if (units & UNIT_VLUT)
+								ains->unit = UNIT_VLUT;
+							else
+								assert(0);
+						}
+					} else {
+						if (last_unit >= UNIT_VADD) {
+							if (units & UNIT_SMUL)
+								ains->unit = UNIT_SMUL;
+							else
+								break;
+						} else {
+							if (units & UNIT_SADD)
+								ains->unit = UNIT_SADD;
+							else {
+								printf("Wondering about %X: %X\n", op, units);
+								assert(units & UNIT_SMUL);
+								ains->unit = UNIT_SMUL;
+							}
+						}
 					}
-
-					if (break_batch)
-						break;
 				}
+
+				printf("UNIT (%X, %d)\n", 0, ains->unit);
 
 				/* Late unit check, this time for encoding (not parallelism) */
 				if (ains->unit <= last_unit) break;
+				/* XXX: Allow parallelism */
+				if (last_unit >= UNIT_VADD && ains->unit >= UNIT_VADD) break;
 
 				/* Only one set of embedded constants per
 				 * bundle possible; if we have more, we must
