@@ -1999,7 +1999,7 @@ emit_fragment_epilogue(compiler_context *ctx)
 	EMIT(alu_br_compact_cond, midgard_jmp_writeout_op_writeout, TAG_ALU_4, -1, COND_FBWRITE);
 }
 
-static void
+static midgard_block *
 emit_block(compiler_context *ctx, nir_block *block)
 {
 	midgard_block this_block;
@@ -2050,9 +2050,10 @@ emit_block(compiler_context *ctx, nir_block *block)
 	/* Finally, register allocation! Must be done after everything else */
 	allocate_registers(ctx);
 
+	return block_ptr;
 }
 
-static void emit_cf_list(struct compiler_context *ctx, struct exec_list *list);
+static midgard_block *emit_cf_list(struct compiler_context *ctx, struct exec_list *list);
 
 static void
 emit_if(struct compiler_context *ctx, nir_if *nif)
@@ -2062,8 +2063,15 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	printf("Current %p\n", ctx->current_block);
 	emit_condition(ctx, &nif->condition);
 
-	emit_cf_list(ctx, &nif->then_list);
-	emit_cf_list(ctx, &nif->else_list);
+	/* Save that block */
+	midgard_instruction *previous_ins = ctx->current_block;
+
+	/* Emit the two subblocks */
+	midgard_block *then_block = emit_cf_list(ctx, &nif->then_list);
+	midgard_block *else_block = emit_cf_list(ctx, &nif->else_list);
+
+	assert(then_block);
+	assert(else_block);
 }
 
 static void
@@ -2072,14 +2080,21 @@ emit_loop(struct compiler_context *ctx, nir_loop *nloop)
 	emit_cf_list(ctx, &nloop->body);
 }
 
-static void
+static midgard_block *
 emit_cf_list(struct compiler_context *ctx, struct exec_list *list)
 {
+	midgard_block *start_block;
+
 	foreach_list_typed(nir_cf_node, node, node, list) {
 		switch (node->type) {
-		case nir_cf_node_block:
-			emit_block(ctx, nir_cf_node_as_block(node));
+		case nir_cf_node_block: {
+			midgard_block *block = emit_block(ctx, nir_cf_node_as_block(node));
+
+			if (!start_block)
+				start_block = block;
+
 			break;
+		}
 		case nir_cf_node_if:
 			emit_if(ctx, nir_cf_node_as_if(node));
 			break;
@@ -2091,6 +2106,8 @@ emit_cf_list(struct compiler_context *ctx, struct exec_list *list)
 			break;
 		}
 	}
+
+	return start_block;
 }
 
 int
