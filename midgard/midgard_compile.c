@@ -1294,6 +1294,7 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 				if (ains->unit <= last_unit) break;
 				/* XXX: Allow parallelism */
 				if (last_unit >= UNIT_VADD && ains->unit >= UNIT_VADD) break;
+				if (last_unit >= UNIT_VMUL && last_unit < UNIT_VADD && ains->unit <= UNIT_VADD) break;
 
 				/* Only one set of embedded constants per
 				 * bundle possible; if we have more, we must
