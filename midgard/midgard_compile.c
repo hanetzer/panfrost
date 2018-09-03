@@ -1662,7 +1662,7 @@ embedded_to_inline_constant(compiler_context *ctx)
 
 				/* Constant overflow after resize */
 				if (scaled_constant != iconstants[component])
-				       continue;
+				       break;
 			} else {
 				scaled_constant = _mesa_float_to_half((float) ins->constants[component]);
 			}
