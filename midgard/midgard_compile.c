@@ -2071,13 +2071,13 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			actualise_ssa_to_alias(ctx);
 			actualise_register_to_ssa(ctx);
 
-			/* Save the block. Initial and final may be the same. */
-			util_dynarray_append(&ctx->blocks, midgard_block, this_block);
-
 			/* Append fragment shader epilogue (value writeout) */
 			if (ctx->stage == MESA_SHADER_FRAGMENT)
 				if (block == nir_impl_last_block(func->impl))
 					emit_fragment_epilogue(ctx);
+
+			/* Save the block. Initial and final may be the same. */
+			util_dynarray_append(&ctx->blocks, midgard_block, this_block);
 
 			midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
 
@@ -2096,17 +2096,16 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		break; /* TODO: Multi-function shaders */
 	}
 
-	struct util_dynarray tags;
-
 	util_dynarray_init(compiled, NULL);
-	util_dynarray_init(&tags, NULL);
 
 	/* ERRATA: Workaround hardware errata where shaders must start with a
 	 * load/store instruction by adding a noop load */
 
+	struct util_dynarray tags;
+	util_dynarray_init(&tags, NULL);
 	int first_tag = 0;
 
-	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(&ctx->initial_block->instructions, midgard_instruction, ins) {
 		if (!ins->unused) {
 			first_tag = ins->type;
 			break;
@@ -2124,36 +2123,42 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		util_dynarray_append(compiled, midgard_load_store, instruction);
 	}
 
-	/* Emit flat binary from the instruction array. Save instruction boundaries such that lookahead tags can be assigned easily */
-	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
-		if (!ins->unused) {
-			util_dynarray_append(&tags, int, compiled->size);
-			ins += emit_binary_instruction(ctx, ins, compiled);
-		}
-	}
+	/* Emit flat binary from the instruction arrays. Iterate each block in
+	 * sequence. Save instruction boundaries such that lookahead tags can
+	 * be assigned easily */
 
-	/* Now just perform lookahead */
-	util_dynarray_foreach(&tags, int, tag) {
-		int lookahead;
+	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
 
-		uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
-
-		if (IN_ARRAY(tag + 1, &tags)) {
-			uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
-
-			if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
-				lookahead = 1;
-			} else {
-				lookahead = *next;
+		util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
+			if (!ins->unused) {
+				util_dynarray_append(&tags, int, compiled->size);
+				ins += emit_binary_instruction(ctx, ins, compiled);
 			}
-		} else {
-			lookahead = 1;
 		}
 
-		*ins |= lookahead << 4;
-	}
+		/* Now just perform lookahead */
+		util_dynarray_foreach(&tags, int, tag) {
+			int lookahead;
 
-	util_dynarray_fini(ctx->current_block);
+			uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
+
+			if (IN_ARRAY(tag + 1, &tags)) {
+				uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
+
+				if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
+					lookahead = 1;
+				} else {
+					lookahead = *next;
+				}
+			} else {
+				lookahead = 1;
+			}
+
+			*ins |= lookahead << 4;
+		}
+
+		util_dynarray_fini(block);
+	}
 
 	/* TODO: Propagate compiled code up correctly */
 	return 0;
