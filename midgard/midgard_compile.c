@@ -273,7 +273,11 @@ typedef struct midgard_block {
 typedef struct compiler_context {
 	gl_shader_stage stage;
 
+	/* Unordered array of midgard_block */
+	struct util_dynarray blocks;
+
 	midgard_block *initial_block;
+	midgard_block *final_block;
 
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray *current_block;
@@ -2039,6 +2043,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		if (!func->impl)
 			continue;
 
+		util_dynarray_init(&ctx->blocks, NULL);
+
 		nir_foreach_block(block, func->impl) {
 			midgard_block this_block;
 
@@ -2065,9 +2071,21 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			actualise_ssa_to_alias(ctx);
 			actualise_register_to_ssa(ctx);
 
+			/* Save the block. Initial and final may be the same. */
+			util_dynarray_append(&ctx->blocks, midgard_block, this_block);
+
 			/* Append fragment shader epilogue (value writeout) */
 			if (ctx->stage == MESA_SHADER_FRAGMENT)
-				emit_fragment_epilogue(ctx);
+				if (block == nir_impl_last_block(func->impl))
+					emit_fragment_epilogue(ctx);
+
+			midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
+
+			if (block == nir_start_block(func->impl))
+				ctx->initial_block = block_ptr;
+
+			if (block == nir_impl_last_block(func->impl))
+				ctx->final_block = block_ptr;
 
 			/* Finally, register allocation! Must be done after everything else */
 			allocate_registers(ctx);
