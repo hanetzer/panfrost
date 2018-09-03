@@ -1281,7 +1281,7 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					int units = alu_opcode_unit[op];
 
 					/* TODO: Promotion of scalars to vectors */
-					int vector = (!is_single_component_mask(ains->alu.mask)) || !(units & UNITS_SCALAR);
+					int vector = (!is_single_component_mask(ains->alu.mask)) || ((units & UNITS_SCALAR) == 0);
 
 					if (vector) {
 						if (last_unit >= UNIT_VADD) {
