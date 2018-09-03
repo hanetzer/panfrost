@@ -76,7 +76,9 @@ typedef struct midgard_branch {
 	/* For conditionals, if this is true, we branch on FALSE. If false, we  branch on TRUE. */
 	bool invert_conditional;
 
-	struct midgard_block *target;
+	/* We can either branch to the start or the end of the block */
+	struct midgard_block *target_start;
+	struct midgard_block *target_after;
 } midgard_branch;
 
 /* Generic in-memory data type repesenting a single logical instruction, rather
@@ -276,13 +278,12 @@ v_alu_br_compact_cond(midgard_jmp_writeout_op op, unsigned tag, signed offset, u
 }
 
 static midgard_instruction
-v_branch(struct midgard_block *target, bool conditional, bool invert)
+v_branch(bool conditional, bool invert)
 {
 	midgard_instruction ins = {
 		.type = TAG_ALU_4,
 		.unit = ALU_ENAB_BRANCH,
 		.branch = {
-			.target = target,
 			.conditional = conditional,
 			.invert_conditional = invert
 		}
@@ -2097,11 +2098,16 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	emit_condition(ctx, &nif->condition);
 
 	/* Speculatively emit the branch, but we can't fill it in until later */
-	EMIT(branch, NULL, true, true);
+	EMIT(branch, true, true);
 	midgard_instruction *then_branch = util_dynarray_top_ptr(ctx->current_block, midgard_instruction);
 
 	/* Emit the two subblocks */
 	midgard_block *then_block = emit_cf_list(ctx, &nif->then_list);
+
+	/* Emit a jump from the end of the then block to the end of the else */
+	EMIT(branch, false, false);
+	midgard_instruction *then_exit = util_dynarray_top_ptr(ctx->current_block, midgard_instruction);
+
 	midgard_block *else_block = emit_cf_list(ctx, &nif->else_list);
 
 	/* Now that we have the subblocks emitted, fix up the branch */
@@ -2109,10 +2115,8 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	assert(then_block);
 	assert(else_block);
 
-	then_branch->branch.target = else_block;
-
-	/* TODO: Emit branch at the end of then_block */
-	/* TODO: Fallthrough else */
+	then_branch->branch.target_start = else_block;
+	then_exit->branch.target_after = else_block;
 }
 
 static void
@@ -2252,17 +2256,26 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			if (ins->unused) continue;
 			if (ins->unit != ALU_ENAB_BRANCH) continue;
 
-			assert(ins->branch.conditional);
-
-			midgard_branch_cond branch = {
-				.op = midgard_jmp_writeout_op_branch_cond,
-				.dest_tag = 0, /* TODO */
-				.offset = 0, /* TODO */
-				.cond = ins->branch.invert_conditional ? 1 : 2
-			};
-
 			uint16_t compact;
-			memcpy(&compact, &branch, sizeof(branch));
+
+			if (ins->branch.conditional) {
+				midgard_branch_cond branch = {
+					.op = midgard_jmp_writeout_op_branch_cond,
+					.dest_tag = 0, /* TODO */
+					.offset = 0, /* TODO */
+					.cond = ins->branch.invert_conditional ? 1 : 2
+				};
+
+				memcpy(&compact, &branch, sizeof(branch));
+			} else {
+				midgard_branch_uncond branch = {
+					.op = midgard_jmp_writeout_op_branch_uncond,
+					.dest_tag = 0, /* TODO */
+					.offset = 0, /* TODO */
+				};
+
+				memcpy(&compact, &branch, sizeof(branch));
+			}
 
 			/* Swap in the generic branch for our actual branch */
 			ins->unit = ALU_ENAB_BR_COMPACT;
