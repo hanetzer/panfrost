@@ -1986,6 +1986,55 @@ emit_fragment_epilogue(compiler_context *ctx)
 	EMIT(alu_br_compact_cond, midgard_jmp_writeout_op_writeout, TAG_ALU_4, -1, COND_FBWRITE);
 }
 
+static void
+emit_block(compiler_context *ctx, nir_function *func, nir_block *block)
+{
+	midgard_block this_block;
+
+	/* Set up current block */
+	util_dynarray_init(&this_block.instructions, NULL);
+	ctx->current_block = &this_block.instructions;
+
+	ctx->ssa_constants = _mesa_hash_table_u64_create(NULL); 
+	ctx->ssa_to_alias = _mesa_hash_table_u64_create(NULL); 
+	ctx->register_to_ssa = _mesa_hash_table_u64_create(NULL); 
+	ctx->ssa_to_register = _mesa_hash_table_u64_create(NULL); 
+	ctx->leftover_ssa_to_alias = _mesa_set_create(NULL, _mesa_hash_pointer, _mesa_key_pointer_equal);
+
+	nir_foreach_instr(instr, block) {
+		emit_instr(ctx, instr);
+	}
+
+	inline_alu_constants(ctx);
+	//embedded_to_inline_constant(ctx);
+
+	//eliminate_varying_mov(ctx);
+
+	/* Perform heavylifting for aliasing */
+	actualise_ssa_to_alias(ctx);
+	actualise_register_to_ssa(ctx);
+
+	/* Append fragment shader epilogue (value writeout) */
+	if (ctx->stage == MESA_SHADER_FRAGMENT)
+		if (block == nir_impl_last_block(func->impl))
+			emit_fragment_epilogue(ctx);
+
+	/* Save the block. Initial and final may be the same. */
+	util_dynarray_append(&ctx->blocks, midgard_block, this_block);
+
+	midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
+
+	if (block == nir_start_block(func->impl))
+		ctx->initial_block = block_ptr;
+
+	if (block == nir_impl_last_block(func->impl))
+		ctx->final_block = block_ptr;
+
+	/* Finally, register allocation! Must be done after everything else */
+	allocate_registers(ctx);
+
+}
+
 int
 midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 {
@@ -2046,49 +2095,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		util_dynarray_init(&ctx->blocks, NULL);
 
 		nir_foreach_block(block, func->impl) {
-			midgard_block this_block;
-
-			/* Set up current block */
-			util_dynarray_init(&this_block.instructions, NULL);
-			ctx->current_block = &this_block.instructions;
-
-			ctx->ssa_constants = _mesa_hash_table_u64_create(NULL); 
-			ctx->ssa_to_alias = _mesa_hash_table_u64_create(NULL); 
-			ctx->register_to_ssa = _mesa_hash_table_u64_create(NULL); 
-			ctx->ssa_to_register = _mesa_hash_table_u64_create(NULL); 
-			ctx->leftover_ssa_to_alias = _mesa_set_create(NULL, _mesa_hash_pointer, _mesa_key_pointer_equal);
-
-			nir_foreach_instr(instr, block) {
-				emit_instr(ctx, instr);
-			}
-
-			inline_alu_constants(ctx);
-			//embedded_to_inline_constant(ctx);
-
-			//eliminate_varying_mov(ctx);
-
-			/* Perform heavylifting for aliasing */
-			actualise_ssa_to_alias(ctx);
-			actualise_register_to_ssa(ctx);
-
-			/* Append fragment shader epilogue (value writeout) */
-			if (ctx->stage == MESA_SHADER_FRAGMENT)
-				if (block == nir_impl_last_block(func->impl))
-					emit_fragment_epilogue(ctx);
-
-			/* Save the block. Initial and final may be the same. */
-			util_dynarray_append(&ctx->blocks, midgard_block, this_block);
-
-			midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
-
-			if (block == nir_start_block(func->impl))
-				ctx->initial_block = block_ptr;
-
-			if (block == nir_impl_last_block(func->impl))
-				ctx->final_block = block_ptr;
-
-			/* Finally, register allocation! Must be done after everything else */
-			allocate_registers(ctx);
+			emit_block(ctx, func, block);
 		}
 
 		break; /* TODO: Multi-function shaders */
