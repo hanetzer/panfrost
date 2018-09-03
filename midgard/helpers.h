@@ -168,8 +168,8 @@ static int alu_opcode_unit[256] = {
 
 	/* Though they output a scalar, they need to run on a vector unit
 	 * since they process vectors */
-	[midgard_alu_op_fdot3]		 = UNITS_VECTOR,
-	[midgard_alu_op_fdot4]		 = UNITS_VECTOR,
+	[midgard_alu_op_fdot3]		 = UNIT_VMUL,
+	[midgard_alu_op_fdot4]		 = UNIT_VMUL,
 
 	[midgard_alu_op_iadd]		 = UNITS_ADD,
 	[midgard_alu_op_isub]		 = UNITS_ADD,
