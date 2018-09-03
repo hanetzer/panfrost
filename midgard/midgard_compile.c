@@ -1168,6 +1168,42 @@ can_ld_st_run_concurrent(midgard_load_store_word *first,
 	return effective_ld_st_reg(first) != effective_ld_st_reg(second);
 }
 
+/* Checks for a data hazard between two adjacent ALU instructions */
+
+static bool
+can_alu_run_concurrent(midgard_instruction *first, midgard_instruction *second)
+{
+	/* Bail early for non-SSA case? */
+	if (!first->uses_ssa || !second->uses_ssa) {
+		printf("Non-SSA?\n");
+		return false;
+	}
+
+	/* Each instruction reads some registers and writes to a register. See
+	 * where the first writes */
+
+	if (first->ssa_args.literal_out)
+		return false; /* Bail */
+
+	int source = first->ssa_args.dest;
+
+	/* As long as the second doesn't read from the first, we're okay */
+	if (second->ssa_args.src0 == source)
+		return false;
+
+	if (second->ssa_args.src1 == source && !second->ssa_args.inline_constant)
+		return false;
+
+	/* Otherwise, it's safe in that regard. Another data hazard is both
+	 * writing to the same place, of course */
+
+	if (!second->ssa_args.literal_out && second->ssa_args.dest == source)
+		return false;
+
+	/* ...That's it */
+	return true;
+}
+
 /* Returns the number of instructions emitted (minus one). In trivial cases,
  * this equals one (zero returned), but when instructions are paired (the
  * optimal case) this can be two, or in the best case for ALUs, up to five. */
@@ -1198,6 +1234,10 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 			int index = 0, last_unit = 0;
 			bool has_embedded_constants = false;
 			float constants[4];
+
+			/* Previous instructions, for the purpose of parallelism */
+			midgard_instruction *segment[4];
+			int segment_size = 0;
 
 			while (ins + index) {
 				midgard_instruction *ains = ins + index; 
@@ -1266,9 +1306,26 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 
 				/* Late unit check, this time for encoding (not parallelism) */
 				if (ains->unit <= last_unit) break;
-				/* XXX: Allow parallelism */
-				if (last_unit >= UNIT_VADD && ains->unit >= UNIT_VADD) break;
-				if (last_unit >= UNIT_VMUL && last_unit < UNIT_VADD && ains->unit <= UNIT_VADD) break;
+
+				/* Clear the segment */
+				if (last_unit < UNIT_VADD && ains->unit >= UNIT_VADD)
+					segment_size = 0;
+
+				/* Check for data hazards */
+				int has_hazard = false;
+
+				for (int s = 0; s < segment_size; ++s)
+					if (!can_alu_run_concurrent(segment[s], ains))
+						has_hazard = true;
+
+				if (has_hazard)
+					break;
+
+				segment[segment_size++] = ains;
+
+				/* ^^ In case that's unsafe, keeping this handy */
+				//if (last_unit >= UNIT_VADD && ains->unit >= UNIT_VADD) break;
+				//if (last_unit >= UNIT_VMUL && last_unit < UNIT_VADD && ains->unit <= UNIT_VADD) break;
 
 				/* Only one set of embedded constants per
 				 * bundle possible; if we have more, we must
