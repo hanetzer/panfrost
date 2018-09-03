@@ -451,6 +451,25 @@ nir_alu_src_index(nir_alu_src *src)
 	return nir_src_index(&src->src);
 }
 
+/* Midgard puts conditionals in r31.w; move an arbitrary source (the output of
+ * a conditional test) into that register */
+
+static void
+emit_condition(compiler_context *ctx, nir_src *src)
+{
+	/* XXX: Force component correct */
+	int condition = nir_src_index(src);
+
+	const midgard_vector_alu_src alu_src = {
+		.swizzle = SWIZZLE(COMPONENT_X, COMPONENT_X, COMPONENT_X, COMPONENT_X),
+	};
+
+	midgard_instruction ins = v_fmov(condition, alu_src, 31, true, midgard_outmod_none);
+	ins.alu.mask = 0x3 << 6; /* mask out w */
+
+	util_dynarray_append(ctx->current_block, midgard_instruction, ins);
+}
+
 /* Components: Number/style of arguments:
  * 	3: One-argument op with r24 (i2f, f2i)
  * 	2: Standard two argument op (fadd, fmul)
@@ -552,21 +571,12 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			components = 2;
 			op = midgard_alu_op_fcsel;
 
-			/* csel puts the condition in r31.w and the inputs are
-			 * shifted over one from NIR */
-
-			/* XXX: Force component correct */
-			int condition = nir_src_index(&instr->src[0].src);
-
-			const midgard_vector_alu_src alu_src = {
-				.swizzle = SWIZZLE(COMPONENT_X, COMPONENT_X, COMPONENT_X, COMPONENT_X),
-			};
-
-			midgard_instruction ins = v_fmov(condition, alu_src, 31, true, midgard_outmod_none);
-			ins.alu.mask = 0x3 << 6; /* mask out w */
-
-			util_dynarray_append((ctx->current_block), midgard_instruction, ins);
+			emit_condition(ctx, &instr->src[0].src);
 			//alias_ssa(ctx, instr->src[0].src.ssa->index, SSA_FIXED_REGISTER(31), true);
+
+			/* The condition is the first argument; move the other
+			 * arguments up one to be a binary instruction for
+			 * Midgard */
 
 			memmove(instr->src, instr->src + 1, 2 * sizeof(nir_alu_src));
 			break;
@@ -2033,6 +2043,10 @@ emit_block(compiler_context *ctx, nir_block *block)
 	if (block == nir_impl_last_block(ctx->func->impl))
 		ctx->final_block = block_ptr;
 
+	/* Allow the next control flow to access us retroactively, for
+	 * branching etc */
+	ctx->current_block = &block_ptr->instructions;
+
 	/* Finally, register allocation! Must be done after everything else */
 	allocate_registers(ctx);
 
@@ -2043,7 +2057,11 @@ static void emit_cf_list(struct compiler_context *ctx, struct exec_list *list);
 static void
 emit_if(struct compiler_context *ctx, nir_if *nif)
 {
-	/* TODO: Do something with the condition */
+	/* Conditional branches expect the condition in r31.w; emit a move for
+	 * that in the _previous_ block (which is the current block). */
+	printf("Current %p\n", ctx->current_block);
+	emit_condition(ctx, &nif->condition);
+
 	emit_cf_list(ctx, &nif->then_list);
 	emit_cf_list(ctx, &nif->else_list);
 }
