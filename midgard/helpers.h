@@ -177,9 +177,10 @@ static int alu_opcode_unit[256] = {
 	[midgard_alu_op_imul]		 = UNITS_ALL,
 	[midgard_alu_op_imov]		 = UNITS_ALL,
 
+	/* For vector comparisons, use ball etc */
 	[midgard_alu_op_feq]		 = UNITS_ALL,
 	[midgard_alu_op_fne]		 = UNITS_ALL,
-	[midgard_alu_op_flt]		 = UNITS_ADD,
+	[midgard_alu_op_flt]		 = UNIT_SADD,
 	[midgard_alu_op_ieq]		 = UNITS_ALL,
 	[midgard_alu_op_ine]		 = UNITS_ALL,
 	[midgard_alu_op_ilt]		 = UNITS_ALL,

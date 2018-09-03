@@ -1081,6 +1081,68 @@ allocate_registers(compiler_context *ctx)
 	}
 }
 
+/* Midgard IR only knows vector ALU types, but we sometimes need to actually
+ * use scalar ALU instructions, for functional or performance reasons. To do
+ * this, we just demote vector ALU payloads to scalar. */
+
+static int
+component_from_mask(unsigned mask) {
+	for (int c = 0; c < 4; ++c) {
+		if (mask & (3 << (2*c)))
+			return c;
+	}
+
+	assert(0);
+}
+
+static bool
+is_single_component_mask(unsigned mask)
+{
+	int components = 0;
+
+	for (int c = 0; c < 4; ++c)
+		if (mask & (3 << (2*c)))
+			components++;
+	
+	return components == 1;
+}
+
+static unsigned
+vector_to_scalar_source(unsigned u)
+{
+	midgard_vector_alu_src v;
+	memcpy(&v, &u, sizeof(v));
+
+	midgard_scalar_alu_src s = {
+		.abs = v.abs,
+		.negate = v.negate,
+		.full = !v.half,
+		.component = v.swizzle & 3
+	};
+
+	unsigned o;
+	memcpy(&o, &s, sizeof(s));
+
+	return o;
+}
+
+static midgard_scalar_alu
+vector_to_scalar_alu(midgard_vector_alu v)
+{
+	/* The output component is from the mask */
+	midgard_scalar_alu s = {
+		.op = v.op,
+		.src1 = vector_to_scalar_source(v.src1),
+		.src2 = vector_to_scalar_source(v.src2),
+		.unknown = 0,
+		.outmod = v.outmod,
+		.output_full = 1, /* TODO: Half */
+		.output_component = component_from_mask(v.mask),
+	};
+
+	return s;
+}
+
 /* Midgard prefetches instruction types, so during emission we need to
  * lookahead too. Unless this is the last instruction, in which we return 1. Or
  * if this is the second to last and the last is an ALU, then it's also 1... */
@@ -1191,7 +1253,7 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					int units = alu_opcode_unit[op];
 
 					/* TODO: Promotion of scalars to vectors */
-					int vector = (ains->alu.mask != 0x3) || 1;
+					int vector = (!is_single_component_mask(ains->alu.mask)) || (units == UNIT_VLUT);
 
 					if (vector) {
 						if (last_unit >= UNIT_VADD) {
@@ -1314,12 +1376,11 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					memcpy(&register_words[register_words_count++], &ains->registers, sizeof(ains->registers));
 					bytes_emitted += sizeof(midgard_reg_info);
 
-					assert(0); /* TODO: Scalars */
-#if 0
+					midgard_scalar_alu scalarised = vector_to_scalar_alu(ains->alu);
+
 					body_size[body_words_count] = sizeof(midgard_scalar_alu);
-					memcpy(&body_words[body_words_count++], &ains->scalar_alu, sizeof(ains->scalar_alu));
+					memcpy(&body_words[body_words_count++], &scalarised, sizeof(midgard_scalar_alu));
 					bytes_emitted += sizeof(midgard_scalar_alu);
-#endif
 				}
 
 				/* Defer marking until after writing to allow for break */
