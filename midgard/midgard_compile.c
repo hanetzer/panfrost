@@ -321,7 +321,6 @@ optimise_nir(nir_shader *nir)
 		NIR_PASS(progress, nir, nir_lower_vars_to_ssa);
 
 		NIR_PASS(progress, nir, nir_copy_prop);
-		NIR_PASS(progress, nir, nir_opt_remove_phis);
 		NIR_PASS(progress, nir, nir_opt_dce);
 		NIR_PASS(progress, nir, nir_opt_dead_cf);
 		NIR_PASS(progress, nir, nir_opt_cse);
@@ -351,11 +350,6 @@ optimise_nir(nir_shader *nir)
 	NIR_PASS(progress, nir, nir_lower_to_source_mods);
 	NIR_PASS(progress, nir, nir_copy_prop);
 	NIR_PASS(progress, nir, nir_opt_dce);
-
-	NIR_PASS(progress, nir, nir_move_vec_src_uses_to_dest);
-	NIR_PASS(progress, nir, nir_lower_vec_to_movs);
-
-	NIR_PASS(progress, nir, nir_convert_from_ssa, true);
 }
 
 /* Front-half of aliasing the SSA slots, merely by inserting the flag in the
@@ -564,8 +558,28 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			break;
 		}
 
+		/* Vector combination from SSA requires some special case TODO */
+		case nir_op_vec2:
+		case nir_op_vec3:
+		case nir_op_vec4: {
+			for (int i = 0; i < nr_components; ++i) {
+				nir_alu_src *asrc = &instr->src[i];
+
+				midgard_vector_alu_src src = vector_alu_modifiers(asrc);
+				int c = asrc->swizzle[0];
+				src.swizzle = SWIZZLE(c, c, c, c);
+				midgard_instruction ins = v_fmov(nir_src_index(&asrc->src), src, dest, false, midgard_outmod_none);
+				ins.alu.mask = 0x3 << (2 * i);
+
+				util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
+			}
+
+			return;
+		};
+
 		default:
-			printf("Unhandled ALU op\n");
+			printf("Unhandled ALU op %X\n", instr->op);
+			assert(0);
 			return;
 	}
 
