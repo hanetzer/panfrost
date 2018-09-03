@@ -103,8 +103,7 @@ typedef struct midgard_instruction {
 
 	union {
 		midgard_load_store_word load_store;
-		midgard_scalar_alu scalar_alu;
-		midgard_vector_alu vector_alu;
+		midgard_vector_alu alu;
 		midgard_texture_word texture;
 		uint16_t br_compact;
 	};
@@ -223,7 +222,7 @@ m_alu_vector(midgard_alu_op op, int unit, unsigned src0, midgard_vector_alu_src 
 			.literal_out = literal_out
 		},
 		.vector = true,
-		.vector_alu = {
+		.alu = {
 			.op = op,
 			.reg_mode = midgard_reg_mode_full,
 			.dest_override = midgard_dest_override_none,
@@ -432,6 +431,20 @@ expand_writemask(unsigned mask)
 	return o;
 }
 
+/* Generate write mask when there are a specific number of components, e.g.
+ * xyz -> 3 -> 0x7 */
+
+static unsigned
+writemask_for_nr_components(int nr_components)
+{
+	unsigned mask = 0;
+	
+	while(nr_components--)
+		mask = (mask << 1) | 1;
+
+	return mask;
+}
+
 static unsigned
 nir_src_index(nir_src *src)
 {
@@ -568,7 +581,7 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 			};
 
 			midgard_instruction ins = v_fmov(condition, alu_src, 31, true, midgard_outmod_none);
-			ins.vector_alu.mask = 0x3 << 6; /* mask out w */
+			ins.alu.mask = 0x3 << 6; /* mask out w */
 
 			util_dynarray_append(&(ctx->current_block), midgard_instruction, ins);
 			//alias_ssa(ctx, instr->src[0].src.ssa->index, SSA_FIXED_REGISTER(31), true);
@@ -632,36 +645,20 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 		nirmod0 = &instr->src[0];
 	}
 
-	if (is_vector) {
-		midgard_vector_alu alu = {
-			.op = op,
-			.reg_mode = midgard_reg_mode_full,
-			.dest_override = midgard_dest_override_none,
-			.outmod = outmod,
+	midgard_vector_alu alu = {
+		.op = op,
+		.reg_mode = midgard_reg_mode_full,
+		.dest_override = midgard_dest_override_none,
+		.outmod = outmod,
 
-			/* Writemask only valid for non-SSA NIR */
-			.mask = is_ssa ? 0xFF : expand_writemask(instr->dest.write_mask),
+		/* Writemask only valid for non-SSA NIR */
+		.mask = is_ssa ? expand_writemask(writemask_for_nr_components(nr_components)) : expand_writemask(instr->dest.write_mask),
 
-			.src1 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod0)),
-			.src2 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod1)),
-		};
+		.src1 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod0)),
+		.src2 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod1)),
+	};
 
-		ins.vector_alu = alu;
-	} else {
-		bool is_full = true; /* TODO */
-
-		midgard_scalar_alu alu = {
-			.op = op,
-			.src1 = scalar_alu_srco_unsigned(scalar_alu_modifiers(nirmod0, is_full)),
-			.src2 = scalar_alu_srco_unsigned(scalar_alu_modifiers(nirmod1, true)),
-			.unknown = 0, /* XXX */
-			.outmod = outmod,
-			.output_full = true, /* XXX */
-			.output_component = 0, /* XXX output_component */
-		};
-
-		ins.scalar_alu = alu;
-	}
+	ins.alu = alu;
 
 	if (_unit == UNIT_VLUT) {
 		/* To avoid duplicating the LUTs (we think?), LUT instructions can only
@@ -674,12 +671,12 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 		memcpy(original_swizzle, nirmod0->swizzle, sizeof(nirmod0->swizzle));
 
 		for (int i = 0; i < nr_components; ++i) {
-			ins.vector_alu.mask = (0x3) << (2 * i); /* Mask the associated component */
+			ins.alu.mask = (0x3) << (2 * i); /* Mask the associated component */
 
 			for (int j = 0; j < 4; ++j)
 				nirmod0->swizzle[j] = original_swizzle[i]; /* Pull from the correct component */
 
-			ins.vector_alu.src1 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod0));
+			ins.alu.src1 = vector_alu_srco_unsigned(vector_alu_modifiers(nirmod0));
 			util_dynarray_append(&ctx->current_block, midgard_instruction, ins);
 		}
 	} else {
@@ -1039,9 +1036,10 @@ allocate_registers(compiler_context *ctx)
 
 					int lower_11 = args.src1 & ((1 << 12) - 1);
 
-					if (ins->vector) {
+					//if (ins->vector) {
 						uint16_t imm = ((lower_11 >> 8) & 0x7) | ((lower_11 & 0xFF) << 3);
-						ins->vector_alu.src2 = imm << 2;
+						ins->alu.src2 = imm << 2;
+#if 0
 					} else {
 						uint16_t imm = 0;
 						imm |= (lower_11 >> 9) & 3;
@@ -1050,6 +1048,8 @@ allocate_registers(compiler_context *ctx)
 						imm |= (lower_11 & 63) << 6;
 						ins->scalar_alu.src2 = imm;
 					}
+#endif
+					//assert(0); /* XXX: Reenable inline constant */
 				} else {
 					ins->registers.src2_reg = dealias_register(ctx, ins, args.src1, ins->uses_ssa);
 				}
@@ -1096,7 +1096,7 @@ emit_binary_vector_instruction(midgard_instruction *ains,
 	*bytes_emitted += sizeof(midgard_reg_info);
 
 	body_size[*body_words_count] = sizeof(midgard_vector_alu);
-	memcpy(&body_words[(*body_words_count)++], &ains->vector_alu, sizeof(ains->vector_alu));
+	memcpy(&body_words[(*body_words_count)++], &ains->alu, sizeof(ains->alu));
 	*bytes_emitted += sizeof(midgard_vector_alu);
 }
 
@@ -1182,10 +1182,13 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 				/* Pick a unit for it if it doesn't force a particular unit */
 
 				if (!ains->unit) {
-					int op = ains->vector ? ains->vector_alu.op : ains->scalar_alu.op;
+					int op = ains->alu.op;
 					int units = alu_opcode_unit[op];
 
-					if (ains->vector) {
+					/* TODO: Promotion of scalars to vectors */
+					int vector = (ains->alu.mask != 0x3) || 1;
+
+					if (vector) {
 						if (last_unit >= UNIT_VADD) {
 							if (units & UNIT_VADD)
 								ains->unit = UNIT_VADD;
@@ -1244,7 +1247,7 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					}
 				}
 
-				if (ains->vector) {
+				if (ains->unit & UNITS_ANY_VECTOR) {
 					emit_binary_vector_instruction(ains, register_words,
 							&register_words_count, body_words,
 							body_size, &body_words_count, &bytes_emitted);
@@ -1276,15 +1279,11 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 							
 							if (qins->registers.out_reg != 0) continue;
 
-							if (qins->vector) {
-								int mask = qins->vector_alu.mask;
+							int mask = qins->alu.mask;
 
-								for (int c = 0; c < 4; ++c)
-									if (mask & (0x3 << (2 * c)))
-										components[c] = true;
-							} else {
-								components[qins->scalar_alu.output_component] = true;
-							}
+							for (int c = 0; c < 4; ++c)
+								if (mask & (0x3 << (2 * c)))
+									components[c] = true;
 						}
 
 						/* If even a single component is not written, break it up (conservative check). */
@@ -1310,9 +1309,12 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					memcpy(&register_words[register_words_count++], &ains->registers, sizeof(ains->registers));
 					bytes_emitted += sizeof(midgard_reg_info);
 
+					assert(0); /* TODO: Scalars */
+#if 0
 					body_size[body_words_count] = sizeof(midgard_scalar_alu);
 					memcpy(&body_words[body_words_count++], &ains->scalar_alu, sizeof(ains->scalar_alu));
 					bytes_emitted += sizeof(midgard_scalar_alu);
+#endif
 				}
 
 				/* Defer marking until after writing to allow for break */
@@ -1481,8 +1483,7 @@ eliminate_varying_mov(compiler_context *ctx)
 		/* Only interest ourselves with fmov instructions */
 		
 		if (move->type != TAG_ALU_4) continue;
-		if (move->vector && move->vector_alu.op != midgard_alu_op_fmov) continue;
-		if (!move->vector && move->scalar_alu.op != midgard_alu_op_fmov) continue;
+		if (move->alu.op != midgard_alu_op_fmov) continue;
 		if (!move->ssa_args.literal_out) continue;
 		if ((move->ssa_args.dest & ~1) != REGISTER_VARYING_BASE) continue;
 
@@ -1548,7 +1549,7 @@ embedded_to_inline_constant(compiler_context *ctx)
 		 * restrictions. So, if possible we try to flip the arguments
 		 * in that case */
 
-		int op = ins->vector ? ins->vector_alu.op : ins->scalar_alu.op;
+		int op = ins->alu.op;
 
 		if (ins->ssa_args.src0 == SSA_FIXED_REGISTER(REGISTER_CONSTANT)) {
 			/* Flip based on op. Fallthrough intentional */
@@ -1587,16 +1588,9 @@ embedded_to_inline_constant(compiler_context *ctx)
 
 					unsigned src_temp;
 
-					if (ins->vector) {
-						src_temp = ins->vector_alu.src2;
-						ins->vector_alu.src2 = ins->vector_alu.src1;
-						ins->vector_alu.src1 = src_temp;
-					} else {
-						src_temp = ins->scalar_alu.src2;
-						ins->scalar_alu.src2 = ins->scalar_alu.src1;
-						ins->scalar_alu.src1 = src_temp;
-					}
-
+					src_temp = ins->alu.src2;
+					ins->alu.src2 = ins->alu.src1;
+					ins->alu.src1 = src_temp;
 				default:
 					break;
 			}
@@ -1620,50 +1614,37 @@ embedded_to_inline_constant(compiler_context *ctx)
 				scaled_constant = _mesa_float_to_half((float) ins->constants[component]);
 			}
 
-			if (ins->vector) {
-				midgard_vector_alu_src *src;
-				int q = ins->vector_alu.src2;
-				midgard_vector_alu_src *m = (midgard_vector_alu_src *) &q;
-				src = m;
+			midgard_vector_alu_src *src;
+			int q = ins->alu.src2;
+			midgard_vector_alu_src *m = (midgard_vector_alu_src *) &q;
+			src = m;
 
-				assert(!src->abs);
-				assert(!src->negate);
-				assert(!src->half);
-				assert(!src->rep_low);
-				assert(!src->rep_high);
+			assert(!src->abs);
+			assert(!src->negate);
+			assert(!src->half);
+			assert(!src->rep_low);
+			assert(!src->rep_high);
 
-				/* Make sure that the constant is not itself a
-				 * vector by checking if all accessed values
-				 * (by the swizzle) are the same. */
+			/* Make sure that the constant is not itself a
+			 * vector by checking if all accessed values
+			 * (by the swizzle) are the same. */
 
-				uint32_t *cons = (uint32_t *) ins->constants;
-				uint32_t value = cons[src->swizzle & 3];
+			uint32_t *cons = (uint32_t *) ins->constants;
+			uint32_t value = cons[src->swizzle & 3];
 
-				bool is_vector = false;
+			bool is_vector = false;
 
-				for (int c = 1; c < 4; ++c) {
-					uint32_t test = cons[(src->swizzle >> (2 * c)) & 3];
-					
-					if (test != value) {
-						is_vector = true;
-						break;
-					}
+			for (int c = 1; c < 4; ++c) {
+				uint32_t test = cons[(src->swizzle >> (2 * c)) & 3];
+				
+				if (test != value) {
+					is_vector = true;
+					break;
 				}
-
-				if (is_vector)
-					continue;
-			} else {
-				midgard_scalar_alu_src *src;
-				int q = ins->scalar_alu.src2;
-				midgard_scalar_alu_src *m = (midgard_scalar_alu_src *) &q;
-				src = m;
-
-				assert(!src->abs);
-				assert(!src->negate);
-				assert(src->full);
-
-				component = src->component;
 			}
+
+			if (is_vector)
+				continue;
 
 			/* Get rid of the embedded constant */
 			ins->has_constants = false; 
