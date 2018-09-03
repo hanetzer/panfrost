@@ -2096,21 +2096,20 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	printf("Current %p\n", ctx->current_block);
 	emit_condition(ctx, &nif->condition);
 
-	/* Save that block */
-	midgard_instruction *previous_ins = ctx->current_block;
+	/* Speculatively emit the branch, but we can't fill it in until later */
+	EMIT(branch, NULL, true, true);
+	midgard_instruction *then_branch = util_dynarray_top_ptr(ctx->current_block, midgard_instruction);
 
 	/* Emit the two subblocks */
 	midgard_block *then_block = emit_cf_list(ctx, &nif->then_list);
 	midgard_block *else_block = emit_cf_list(ctx, &nif->else_list);
 
-	/* Now that we have the subblocks emitted, emit a branch to them */
+	/* Now that we have the subblocks emitted, fix up the branch */
 
 	assert(then_block);
 	assert(else_block);
 
-	/* TODO: Only emit one branch (fallthrough to then) */
-	EMIT(branch, then_block, true, false);
-	EMIT(branch, else_block, true, true);
+	then_branch->branch.target = else_block;
 
 	/* TODO: Emit branch at the end of then_block */
 	/* TODO: Fallthrough else */
