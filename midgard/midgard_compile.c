@@ -594,8 +594,6 @@ emit_alu(compiler_context *ctx, nir_alu_instr *instr)
 	if (!(_unit & UNITS_SCALAR))
 		is_vector = true;
 
-	printf("EMITTING %X\n", op);
-
 	/* Initialise fields common between scalar/vector instructions */
 	midgard_outmod outmod = instr->dest.saturate ? midgard_outmod_sat : midgard_outmod_none;
 
@@ -1215,15 +1213,12 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 							if (units & UNIT_SADD)
 								ains->unit = UNIT_SADD;
 							else {
-								printf("Wondering about %X: %X\n", op, units);
 								assert(units & UNIT_SMUL);
 								ains->unit = UNIT_SMUL;
 							}
 						}
 					}
 				}
-
-				printf("UNIT (%X, %d)\n", 0, ains->unit);
 
 				/* Late unit check, this time for encoding (not parallelism) */
 				if (ains->unit <= last_unit) break;
