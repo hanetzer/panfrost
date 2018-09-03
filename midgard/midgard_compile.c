@@ -160,14 +160,6 @@ vector_alu_srco_unsigned(midgard_vector_alu_src src)
 	return u;
 }
 
-static unsigned
-scalar_alu_srco_unsigned(midgard_scalar_alu_src src)
-{
-	unsigned u;
-	memcpy(&u, &src, sizeof(src));
-	return u;
-}
-
 /* Inputs a NIR ALU source, with modifiers attached if necessary, and outputs
  * the corresponding Midgard source */
 
@@ -183,24 +175,6 @@ vector_alu_modifiers(nir_alu_src *src)
 		.rep_high = 0,
 		.half = 0, /* TODO */
 		.swizzle = SWIZZLE_FROM_ARRAY(src->swizzle)
-	};
-
-	return alu_src;
-}
-
-/* Full 1 parameters refer to "non-half-float mode" and "first src in scalar
- * instruction" to account for a weird special case */
-
-static midgard_scalar_alu_src
-scalar_alu_modifiers(nir_alu_src *src, bool full1)
-{
-	if (!src) return blank_scalar_alu_src;
-
-	midgard_scalar_alu_src alu_src = {
-		.abs = src->abs,
-		.negate = src->negate,
-		.full = 1, /* TODO */
-		.component = src->swizzle[0] << (full1 ? 1 : 0) /* TODO: Is this actually correct? */
 	};
 
 	return alu_src;
