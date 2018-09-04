@@ -330,6 +330,9 @@ typedef struct midgard_block {
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray instructions;
 
+	/* Block number sequentially in the function */
+	int source_idx;
+
 	bool is_scheduled;
 
 	/* List of midgard_bundles emitted (after the scheduler has run) */
@@ -1595,6 +1598,7 @@ skip_instruction:
 static void
 schedule_block(compiler_context *ctx, midgard_block *block)
 {
+	printf("Scheduling block %p\n", block);
 	util_dynarray_init(&block->bundles, NULL);
 
 	util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
@@ -2151,6 +2155,9 @@ emit_block(compiler_context *ctx, nir_block *block)
 	midgard_block this_block;
 	this_block.is_scheduled = false;
 
+	/* Source index is the number of blocks, before pushing */
+	this_block.source_idx = (ctx->blocks.size / sizeof(midgard_block));
+
 	/* Set up current block */
 	util_dynarray_init(&this_block.instructions, NULL);
 	ctx->current_block = &this_block.instructions;
@@ -2186,6 +2193,7 @@ emit_block(compiler_context *ctx, nir_block *block)
 	util_dynarray_append(&ctx->blocks, midgard_block, this_block);
 
 	midgard_block *block_ptr = util_dynarray_top_ptr(&ctx->blocks, midgard_block);
+	printf("Pushed up %p\n", block_ptr);
 
 	if (block == nir_start_block(ctx->func->impl))
 		ctx->initial_block = block_ptr;
@@ -2234,8 +2242,8 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	assert(then_block);
 	assert(else_block);
 
-	then_branch->branch.target_start = else_block;
-	then_exit->branch.target_after = else_block;
+	then_branch->branch.target_start = else_block->source_idx;
+	then_exit->branch.target_start = else_block->source_idx + 1;
 }
 
 static void
@@ -2371,6 +2379,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	 * sizes, emit actual branch instructions rather than placeholders */
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		printf("Scheduled? %d\n", block->is_scheduled);
 		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
 			for (int c = 0; c < bundle->instruction_count; ++c) {
 				midgard_instruction *ins = &bundle->instructions[c];
@@ -2381,10 +2390,9 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				uint16_t compact;
 
 				/* Determine the block we're jumping to */
-				midgard_block *target = ins->branch.target_start;
-
-				if (!target)
-					target = ins->branch.target_after->next_fallthrough;
+				int target_number = ins->branch.target_start;
+				printf("Target number %d\n", target_number);
+				midgard_block *target = util_dynarray_element(&ctx->blocks, midgard_block, target_number);
 
 				assert(target);
 				printf("Target %p\n", target);
@@ -2420,7 +2428,6 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 				/* Swap in the generic branch for our actual branch */
 				ins->unit = ALU_ENAB_BR_COMPACT;
-				ins->compact_branch = true;
 				ins->br_compact = compact;
 			}
 		}
