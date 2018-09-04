@@ -1613,15 +1613,17 @@ schedule_program(compiler_context *ctx)
 /* After everything is scheduled, emit whole bundles at a time */
 
 static void
-emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dynarray *emission)
+emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dynarray *emission, int next_tag)
 {
+	int lookahead = next_tag << 4;
+
 	switch(bundle->tag) {
 		case TAG_ALU_4:
 		case TAG_ALU_8:
 		case TAG_ALU_12:
 		case TAG_ALU_16: {
                        /* Actually emit each component */
-		       util_dynarray_append(emission, uint32_t, bundle->control);
+		       util_dynarray_append(emission, uint32_t, bundle->control | lookahead);
 
                        for (int i = 0; i < bundle->register_words_count; ++i)
                                util_dynarray_append(emission, uint16_t, bundle->register_words[i]);
@@ -1660,6 +1662,7 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 
 			midgard_load_store instruction = {
 				.type = bundle->tag,
+				.next_type = next_tag,
 				.word1 = current64,
 				.word2 = next64
 			};
@@ -1676,6 +1679,7 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 			midgard_instruction *ins = &bundle->instructions[0];
 
 			ins->texture.type = TAG_TEXTURE_4;
+			ins->texture.next_type = next_tag;
 
 			ctx->texture_op_count--;
 
@@ -2315,8 +2319,6 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	/* ERRATA: Workaround hardware errata where shaders must start with a
 	 * load/store instruction by adding a noop load */
 
-	struct util_dynarray tags;
-	util_dynarray_init(&tags, NULL);
 	int first_tag = 0;
 
 	util_dynarray_foreach(&ctx->initial_block->instructions, midgard_instruction, ins) {
@@ -2333,7 +2335,6 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			.word2 = 3
 		};
 
-		util_dynarray_append(&tags, int, compiled->size);
 		util_dynarray_append(compiled, midgard_load_store, instruction);
 	}
 
@@ -2397,32 +2398,24 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
 		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
-			emit_binary_bundle(ctx, bundle, compiled);
+			int lookahead = 1;
+
+			if (IN_ARRAY(bundle + 1, &block->bundles)) {
+				uint8_t next = (bundle + 1)->tag;
+
+				if (!IN_ARRAY(bundle + 2, &block->bundles) && IS_ALU(next)) {
+					lookahead = 1;
+				} else {
+					lookahead = next;
+				}
+			}
+
+
+			emit_binary_bundle(ctx, bundle, compiled, lookahead);
 		}
 
 		/* TODO: Free deeper */
 		util_dynarray_fini(block);
-	}
-
-	/* Now just perform lookahead */
-	util_dynarray_foreach(&tags, int, tag) {
-		int lookahead;
-
-		uint8_t *ins = ((uint8_t *) compiled->data) + *tag;
-
-		if (IN_ARRAY(tag + 1, &tags)) {
-			uint8_t *next = ((uint8_t *) compiled->data) + *(tag + 1);
-
-			if (!IN_ARRAY(tag + 2, &tags) && IS_ALU(*next)) {
-				lookahead = 1;
-			} else {
-				lookahead = *next;
-			}
-		} else {
-			lookahead = 1;
-		}
-
-		*ins |= lookahead << 4;
 	}
 
 	/* TODO: Propagate compiled code up correctly */
