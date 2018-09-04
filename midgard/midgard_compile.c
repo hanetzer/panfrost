@@ -1459,7 +1459,6 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 						emit_binary_vector_instruction(&ins, bundle.register_words,
 								&bundle.register_words_count, bundle.body_words,
 								bundle.body_size, &bundle.body_words_count, &bytes_emitted);
-						printf("index zero\n");
 					} else {
 						/* Analyse the group to see if r0 is written in full */
 						bool components[4] = { 0 };
@@ -1487,8 +1486,6 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 						if (breakup)
 							break;
 
-						printf("index full\n");
-
 						/* Otherwise, we're free to proceed */
 					}
 
@@ -1498,13 +1495,12 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 				} else {
 					/* TODO: Vector/scalar stuff operates in parallel. This is probably faulty logic */
 
- 					midgard_scalar_alu scalarised = vector_to_scalar_alu(ains->alu);
 
 					memcpy(&bundle.register_words[bundle.register_words_count++], &ains->registers, sizeof(ains->registers));
 					bytes_emitted += sizeof(midgard_reg_info);
 
 					bundle.body_size[bundle.body_words_count] = sizeof(midgard_scalar_alu);
-                                        memcpy(&bundle.body_words[bundle.body_words_count++], &scalarised, sizeof(midgard_scalar_alu));
+					bundle.body_words_count++;
 					bytes_emitted += sizeof(midgard_scalar_alu);
 				}
 
@@ -1628,8 +1624,26 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
                        for (int i = 0; i < bundle->register_words_count; ++i)
                                util_dynarray_append(emission, uint16_t, bundle->register_words[i]);
 
-                       for (int i = 0; i < bundle->body_words_count; ++i)
-                               memcpy(util_dynarray_grow(emission, bundle->body_size[i]), &bundle->body_words[i], bundle->body_size[i]);
+		       /* Emit body words based on the instructions bundled */
+		       for (int i = 0; i < bundle->instruction_count; ++i) {
+			       midgard_instruction *ins = &bundle->instructions[i];
+
+			       if (ins->unit & UNITS_ANY_VECTOR) {
+					memcpy(util_dynarray_grow(emission, sizeof(midgard_vector_alu)), &ins->alu, sizeof(midgard_vector_alu));
+			       } else if (ins->compact_branch) {
+				       /* Dummy move, XXX DRY */
+				       if (i == 0) {
+						midgard_instruction ins = v_fmov(0, blank_alu_src, 0, true, midgard_outmod_none);
+						memcpy(util_dynarray_grow(emission, sizeof(midgard_vector_alu)), &ins.alu, sizeof(midgard_vector_alu));
+				       }
+
+					memcpy(util_dynarray_grow(emission, sizeof(ins->br_compact)), &ins->br_compact, sizeof(ins->br_compact));
+			       } else {
+				       /* Scalar */
+ 					midgard_scalar_alu scalarised = vector_to_scalar_alu(ins->alu);
+					memcpy(util_dynarray_grow(emission, sizeof(scalarised)), &scalarised, sizeof(scalarised));
+			       }
+		       }
 
                        /* Emit padding */
                        util_dynarray_grow(emission, bundle->padding);
