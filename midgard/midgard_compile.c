@@ -1602,7 +1602,6 @@ schedule_program(compiler_context *ctx)
 static void
 emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dynarray *emission)
 {
-	printf("Bundle\n");
 	switch(bundle->tag) {
 		case TAG_ALU_4:
 		case TAG_ALU_8:
@@ -1613,7 +1612,6 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 		 }
 
 		case TAG_LOAD_STORE_4: {
-					       printf("LD\n");
 			/* One or two composing instructions */
 
 			uint64_t current64, next64;
@@ -1640,7 +1638,6 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 		case TAG_TEXTURE_4: {
 			/* Texture instructions are easy, since there is no
 			 * pipelining nor VLIW to worry about. We may need to set the .last flag */
-			printf("Tex\n");
 			
 			midgard_instruction *ins = &bundle->instructions[0];
 
