@@ -110,6 +110,7 @@ typedef struct midgard_instruction {
 
 	bool compact_branch;
 	bool writeout;
+	bool prepacked_branch;
 
 	/* dynarray's are O(n) to delete from, which makes peephole
 	 * optimisations a little awkward. Instead, just have an unused flag
@@ -271,6 +272,7 @@ v_alu_br_compact_cond(midgard_jmp_writeout_op op, unsigned tag, signed offset, u
 		.unused = false,
 		.uses_ssa = false,
 
+		.prepacked_branch = true,
 		.compact_branch = true, 
 		.br_compact = compact
 	};
@@ -2386,6 +2388,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 				if (ins->unused) continue;
 				if (ins->unit != ALU_ENAB_BR_COMPACT) continue;
+				if (ins->prepacked_branch) continue;
 
 				uint16_t compact;
 
@@ -2437,22 +2440,41 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	 * sequence. Save instruction boundaries such that lookahead tags can
 	 * be assigned easily */
 
+	/* Cache _all_ bundles in source order for lookahead across failed branches */
+
+	int bundle_count = 0;
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		bundle_count += block->bundles.size / sizeof(midgard_bundle);
+	}
+	printf("Bundle count %d\n", bundle_count);
+	midgard_bundle **source_order_bundles = malloc(sizeof(midgard_bundle*) * bundle_count);
+	int bundle_idx = 0;
+	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
+			source_order_bundles[bundle_idx++] = bundle;
+		}
+	}
+		
+
+	int current_bundle = 0;
+
+	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		printf("Emit block\n");
 		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
 			int lookahead = 1;
 
-			if (IN_ARRAY(bundle + 1, &block->bundles)) {
-				uint8_t next = (bundle + 1)->tag;
+			if (current_bundle + 1 < bundle_count) {
+				uint8_t next = source_order_bundles[current_bundle + 1]->tag;
 
-				if (!IN_ARRAY(bundle + 2, &block->bundles) && IS_ALU(next)) {
+				if (!(current_bundle + 2 < bundle_count) && IS_ALU(next)) {
 					lookahead = 1;
 				} else {
 					lookahead = next;
 				}
 			}
 
-
 			emit_binary_bundle(ctx, bundle, compiled, lookahead);
+			++current_bundle;
 		}
 
 		/* TODO: Free deeper */
