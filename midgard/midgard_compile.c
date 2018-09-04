@@ -286,7 +286,7 @@ v_branch(bool conditional, bool invert)
 {
 	midgard_instruction ins = {
 		.type = TAG_ALU_4,
-		.unit = ALU_ENAB_BRANCH,
+		.unit = ALU_ENAB_BR_COMPACT,
 		.compact_branch = true,
 		.branch = {
 			.conditional = conditional,
@@ -1647,7 +1647,7 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 					memcpy(util_dynarray_grow(emission, sizeof(midgard_vector_alu)), &ins->alu, sizeof(midgard_vector_alu));
 			       } else if (ins->compact_branch) {
 				       /* Dummy move, XXX DRY */
-				       if (i == 0) {
+				       if ((i == 0) && ins->writeout) {
 						midgard_instruction ins = v_fmov(0, blank_alu_src, 0, true, midgard_outmod_none);
 						memcpy(util_dynarray_grow(emission, sizeof(midgard_vector_alu)), &ins.alu, sizeof(midgard_vector_alu));
 				       }
@@ -2385,7 +2385,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				midgard_instruction *ins = &bundle->instructions[c];
 
 				if (ins->unused) continue;
-				if (ins->unit != ALU_ENAB_BRANCH) continue;
+				if (ins->unit != ALU_ENAB_BR_COMPACT) continue;
 
 				uint16_t compact;
 
