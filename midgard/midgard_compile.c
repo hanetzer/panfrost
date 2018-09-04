@@ -306,6 +306,19 @@ typedef struct midgard_bundle {
 	/* Instructions contained by the bundle */
 	int instruction_count;
 	midgard_instruction instructions[5];
+
+	/* Bundle-wide ALU configuration */
+	int padding;
+	int control;
+	bool has_embedded_constants;
+	float constants[4];
+
+	uint16_t register_words[8];
+	int register_words_count;
+
+	uint64_t body_words[8];
+	size_t body_size[8];
+	int body_words_count;
 } midgard_bundle;
 
 typedef struct midgard_block {
@@ -1299,30 +1312,18 @@ static midgard_bundle
 schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 {
 	int instructions_emitted = 0;
-	midgard_bundle bundle;
+	midgard_bundle bundle = { 0 };
 
 	uint8_t tag = ins->type;
 
 	/* Default to the instruction's tag */
 	bundle.tag = tag;
 
-	/* Disable proper scheduling for now */
-#if 0
 	switch(ins->type) {
-		case TAG_ALU_4:
-		case TAG_ALU_8:
-		case TAG_ALU_12:
-		case TAG_ALU_16: {
+		case TAG_ALU_4: {
 			uint32_t control = 0;
 			size_t bytes_emitted = sizeof(control);
-
-			uint16_t register_words[8];
-			int register_words_count = 0;
-
-			uint64_t body_words[8];
-			size_t body_size[8];
-			int body_words_count = 0;
-			
+		
 			/* TODO: Constant combining */
 			int index = 0, last_unit = 0;
 			bool has_embedded_constants = false;
@@ -1421,24 +1422,24 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 				 * break the chain early, unfortunately */
 
 				if (ains->has_constants) {
-					if (has_embedded_constants) {
+					if (bundle.has_embedded_constants) {
 						/* ...but if there are already
 						 * constants but these are the
 						 * *same* constants, we let it
 						 * through */
 
-						if (memcmp(constants, ains->constants, sizeof(constants)))
+						if (memcmp(bundle.constants, ains->constants, sizeof(bundle.constants)))
 							break;
 					} else {
-						has_embedded_constants = true;
-						memcpy(constants, ains->constants, sizeof(constants));
+						bundle.has_embedded_constants = true;
+						memcpy(bundle.constants, ains->constants, sizeof(bundle.constants));
 					}
 				}
 
 				if (ains->unit & UNITS_ANY_VECTOR) {
-					emit_binary_vector_instruction(ains, register_words,
-							&register_words_count, body_words,
-							body_size, &body_words_count, &bytes_emitted);
+					emit_binary_vector_instruction(ains, bundle.register_words,
+							&bundle.register_words_count, bundle.body_words,
+							bundle.body_size, &bundle.body_words_count, &bytes_emitted);
 				} else if (ains->compact_branch) {
 					/* ERRATA: Workaround hardware errata
 					 * where branches cannot stand alone in
@@ -1455,9 +1456,9 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 
 						control |= ins.unit;
 
-						emit_binary_vector_instruction(&ins, register_words,
-								&register_words_count, body_words,
-								body_size, &body_words_count, &bytes_emitted);
+						emit_binary_vector_instruction(&ins, bundle.register_words,
+								&bundle.register_words_count, bundle.body_words,
+								bundle.body_size, &bundle.body_words_count, &bytes_emitted);
 					} else {
 						/* Analyse the group to see if r0 is written in full */
 						bool components[4] = { 0 };
@@ -1488,13 +1489,13 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 						/* Otherwise, we're free to proceed */
 					}
 
-					body_size[body_words_count] = sizeof(ains->br_compact);
+					bundle.body_size[bundle.body_words_count] = sizeof(ains->br_compact);
 					bytes_emitted += sizeof(ains->br_compact);
 				} else {
 					/* TODO: Vector/scalar stuff operates in parallel. This is probably faulty logic */
 
 					bytes_emitted += sizeof(midgard_reg_info);
-					body_size[body_words_count] = sizeof(midgard_scalar_alu);
+					bundle.body_size[bundle.body_words_count] = sizeof(midgard_scalar_alu);
 					bytes_emitted += sizeof(midgard_scalar_alu);
 				}
 
@@ -1519,15 +1520,18 @@ skip_instruction:
 			}
 
 			/* Constants must always be quadwords */
-			if (has_embedded_constants)
+			if (bundle.has_embedded_constants)
 				bytes_emitted += 16;
 
 			/* Size ALU instruction for tag */
 			bundle.tag = (TAG_ALU_4) + (bytes_emitted / 16) - 1;
+			bundle.padding = padding;
+			bundle.control = bundle.tag | control;
 
 			break;
 		 }
 
+#if 0
 		case TAG_LOAD_STORE_4: {
 			/* Load store instructions have two words at once. If we
 			 * only have one queued up, we need to NOP pad.
@@ -1558,12 +1562,12 @@ skip_instruction:
 		case TAG_TEXTURE_4:
 			/* TODO: Schedule texture ops */
 			break;
+#endif
 
 		default:
 			printf("Unknown midgard instruction type\n");
 			break;
 	}
-#endif
 
 	/* Copy the instructions into the bundle */
 	bundle.instruction_count = instructions_emitted + 1;
@@ -1607,6 +1611,27 @@ emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dy
 		case TAG_ALU_8:
 		case TAG_ALU_12:
 		case TAG_ALU_16: {
+                       /* Actually emit each component */
+		       util_dynarray_append(emission, uint32_t, bundle->control);
+
+                       for (int i = 0; i < bundle->register_words_count; ++i)
+                               util_dynarray_append(emission, uint16_t, bundle->register_words[i]);
+
+                       for (int i = 0; i < bundle->body_words_count; ++i)
+                               memcpy(util_dynarray_grow(emission, bundle->body_size[i]), &bundle->body_words[i], bundle->body_size[i]);
+
+                       /* Emit padding */
+                       util_dynarray_grow(emission, bundle->padding);
+
+                       /* Tack on constants */
+
+                       if (bundle->has_embedded_constants) {
+			       util_dynarray_append(emission, float, bundle->constants[0]);
+			       util_dynarray_append(emission, float, bundle->constants[1]);
+			       util_dynarray_append(emission, float, bundle->constants[2]);
+			       util_dynarray_append(emission, float, bundle->constants[3]);
+                       }
+
 			printf("Skip ALU\n");
 			break;
 		 }
