@@ -109,6 +109,7 @@ typedef struct midgard_instruction {
 	float constants[4];
 
 	bool compact_branch;
+	bool writeout;
 
 	/* dynarray's are O(n) to delete from, which makes peephole
 	 * optimisations a little awkward. Instead, just have an unused flag
@@ -274,6 +275,9 @@ v_alu_br_compact_cond(midgard_jmp_writeout_op op, unsigned tag, signed offset, u
 		.br_compact = compact
 	};
 
+	if (op == midgard_jmp_writeout_op_writeout)
+		ins.writeout = true;
+
 	return ins;
 }
 
@@ -283,6 +287,7 @@ v_branch(bool conditional, bool invert)
 	midgard_instruction ins = {
 		.type = TAG_ALU_4,
 		.unit = ALU_ENAB_BRANCH,
+		.compact_branch = true,
 		.branch = {
 			.conditional = conditional,
 			.invert_conditional = invert
@@ -324,6 +329,8 @@ typedef struct midgard_bundle {
 typedef struct midgard_block {
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray instructions;
+
+	bool is_scheduled;
 
 	/* List of midgard_bundles emitted (after the scheduler has run) */
 	struct util_dynarray bundles;
@@ -1451,42 +1458,44 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 					 * For now, emit a dummy move always
 					 * (slow!) */
 
-					if (index == 0) {
-						midgard_instruction ins = v_fmov(0, blank_alu_src, 0, true, midgard_outmod_none);
+					if (ains->writeout) {
+						if (index == 0) {
+							midgard_instruction ins = v_fmov(0, blank_alu_src, 0, true, midgard_outmod_none);
 
-						control |= ins.unit;
+							control |= ins.unit;
 
-						emit_binary_vector_instruction(&ins, bundle.register_words,
-								&bundle.register_words_count, bundle.body_words,
-								bundle.body_size, &bundle.body_words_count, &bytes_emitted);
-					} else {
-						/* Analyse the group to see if r0 is written in full */
-						bool components[4] = { 0 };
+							emit_binary_vector_instruction(&ins, bundle.register_words,
+									&bundle.register_words_count, bundle.body_words,
+									bundle.body_size, &bundle.body_words_count, &bytes_emitted);
+						} else {
+							/* Analyse the group to see if r0 is written in full */
+							bool components[4] = { 0 };
 
-						for (int t = 0; t < index; ++t) {
-							midgard_instruction *qins = ins + t;
-							
-							if (qins->registers.out_reg != 0) continue;
+							for (int t = 0; t < index; ++t) {
+								midgard_instruction *qins = ins + t;
+								
+								if (qins->registers.out_reg != 0) continue;
 
-							int mask = qins->alu.mask;
+								int mask = qins->alu.mask;
+
+								for (int c = 0; c < 4; ++c)
+									if (mask & (0x3 << (2 * c)))
+										components[c] = true;
+							}
+
+							/* If even a single component is not written, break it up (conservative check). */
+
+							bool breakup = false;
 
 							for (int c = 0; c < 4; ++c)
-								if (mask & (0x3 << (2 * c)))
-									components[c] = true;
+								if (!components[c])
+									breakup = true;
+
+							if (breakup)
+								break;
+
+							/* Otherwise, we're free to proceed */
 						}
-
-						/* If even a single component is not written, break it up (conservative check). */
-
-						bool breakup = false;
-
-						for (int c = 0; c < 4; ++c)
-							if (!components[c])
-								breakup = true;
-
-						if (breakup)
-							break;
-
-						/* Otherwise, we're free to proceed */
 					}
 
 					bundle.body_size[bundle.body_words_count] = sizeof(ains->br_compact);
@@ -1596,6 +1605,8 @@ schedule_block(compiler_context *ctx, midgard_block *block)
 			ins += bundle.instruction_count - 1;
 		}
 	}
+
+	block->is_scheduled = true;
 }
 
 static void
@@ -2138,6 +2149,7 @@ static midgard_block *
 emit_block(compiler_context *ctx, nir_block *block)
 {
 	midgard_block this_block;
+	this_block.is_scheduled = false;
 
 	/* Set up current block */
 	util_dynarray_init(&this_block.instructions, NULL);
@@ -2359,50 +2371,58 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	 * sizes, emit actual branch instructions rather than placeholders */
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
-		util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
-			if (ins->unused) continue;
-			if (ins->unit != ALU_ENAB_BRANCH) continue;
+		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
+			for (int c = 0; c < bundle->instruction_count; ++c) {
+				midgard_instruction *ins = &bundle->instructions[c];
 
-			uint16_t compact;
+				if (ins->unused) continue;
+				if (ins->unit != ALU_ENAB_BRANCH) continue;
 
-			/* Determine the block we're jumping to */
-			midgard_block *target = ins->branch.target_start;
+				uint16_t compact;
 
-			if (!target)
-				target = ins->branch.target_after->next_fallthrough;
+				/* Determine the block we're jumping to */
+				midgard_block *target = ins->branch.target_start;
 
-			assert(target);
+				if (!target)
+					target = ins->branch.target_after->next_fallthrough;
 
-			/* Determine the destination tag */
-			midgard_instruction *first = util_dynarray_element(&target->instructions, midgard_instruction, 0);
+				assert(target);
+				printf("Target %p\n", target);
+				printf("Scheduled %d\n", target->is_scheduled);
+				printf("Bundles %p\n", &target->bundles);
 
-			int dest_tag = first->type;
-			printf("Dest tag: %X\n", dest_tag);
+				/* Determine the destination tag */
+				midgard_bundle *first = util_dynarray_element(&target->bundles, midgard_bundle, 0);
+				assert(first);
 
-			if (ins->branch.conditional) {
-				midgard_branch_cond branch = {
-					.op = midgard_jmp_writeout_op_branch_cond,
-					.dest_tag = dest_tag, /* TODO */
-					.offset = 0, /* TODO */
-					.cond = ins->branch.invert_conditional ? 1 : 2
-				};
+				int dest_tag = first->tag;
+				printf("Dest tag: %X\n", dest_tag);
 
-				memcpy(&compact, &branch, sizeof(branch));
-			} else {
-				midgard_branch_uncond branch = {
-					.op = midgard_jmp_writeout_op_branch_uncond,
-					.dest_tag = dest_tag, /* TODO */
-					.offset = 0, /* TODO */
-					.unknown = 1
-				};
+				if (ins->branch.conditional) {
+					midgard_branch_cond branch = {
+						.op = midgard_jmp_writeout_op_branch_cond,
+						.dest_tag = dest_tag, /* TODO */
+						.offset = 0, /* TODO */
+						.cond = ins->branch.invert_conditional ? 1 : 2
+					};
 
-				memcpy(&compact, &branch, sizeof(branch));
+					memcpy(&compact, &branch, sizeof(branch));
+				} else {
+					midgard_branch_uncond branch = {
+						.op = midgard_jmp_writeout_op_branch_uncond,
+						.dest_tag = dest_tag, /* TODO */
+						.offset = 0, /* TODO */
+						.unknown = 1
+					};
+
+					memcpy(&compact, &branch, sizeof(branch));
+				}
+
+				/* Swap in the generic branch for our actual branch */
+				ins->unit = ALU_ENAB_BR_COMPACT;
+				ins->compact_branch = true;
+				ins->br_compact = compact;
 			}
-
-			/* Swap in the generic branch for our actual branch */
-			ins->unit = ALU_ENAB_BR_COMPACT;
-			ins->compact_branch = true;
-			ins->br_compact = compact;
 		}
 	}
 
