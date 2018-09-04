@@ -332,9 +332,6 @@ typedef struct midgard_block {
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray instructions;
 
-	/* Block number sequentially in the function */
-	int source_idx;
-
 	bool is_scheduled;
 
 	/* List of midgard_bundles emitted (after the scheduler has run) */
@@ -350,6 +347,7 @@ typedef struct compiler_context {
 	nir_function *func;
 
 	/* Unordered array of midgard_block */
+	int block_count;
 	struct util_dynarray blocks;
 
 	midgard_block *initial_block;
@@ -2156,9 +2154,7 @@ emit_block(compiler_context *ctx, nir_block *block)
 {
 	midgard_block this_block;
 	this_block.is_scheduled = false;
-
-	/* Source index is the number of blocks, before pushing */
-	this_block.source_idx = (ctx->blocks.size / sizeof(midgard_block));
+	++ctx->block_count;
 
 	/* Set up current block */
 	util_dynarray_init(&this_block.instructions, NULL);
@@ -2229,14 +2225,17 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	/* Speculatively emit the branch, but we can't fill it in until later */
 	EMIT(branch, true, true);
 	midgard_instruction *then_branch = util_dynarray_top_ptr(ctx->current_block, midgard_instruction);
+	printf("count %d\n", ctx->block_count);
 
 	/* Emit the two subblocks */
 	midgard_block *then_block = emit_cf_list(ctx, &nif->then_list);
+	printf("then %d\n", ctx->block_count);
 
 	/* Emit a jump from the end of the then block to the end of the else */
 	EMIT(branch, false, false);
 	midgard_instruction *then_exit = util_dynarray_top_ptr(ctx->current_block, midgard_instruction);
 
+	int else_idx = ctx->block_count;
 	midgard_block *else_block = emit_cf_list(ctx, &nif->else_list);
 
 	/* Now that we have the subblocks emitted, fix up the branch */
@@ -2244,8 +2243,9 @@ emit_if(struct compiler_context *ctx, nir_if *nif)
 	assert(then_block);
 	assert(else_block);
 
-	then_branch->branch.target_start = else_block->source_idx;
-	then_exit->branch.target_start = else_block->source_idx + 1;
+	printf("ELSE IDX %d\n", else_idx);
+	then_branch->branch.target_start = else_idx;
+	then_exit->branch.target_start = else_idx + 1;
 }
 
 static void
@@ -2342,6 +2342,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 			continue;
 
 		util_dynarray_init(&ctx->blocks, NULL);
+		ctx->block_count = 0;
 		ctx->func = func;
 
 		emit_cf_list(ctx, &func->impl->body);
@@ -2380,6 +2381,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	/* Now that all the bundles are schedule and we can calculate block
 	 * sizes, emit actual branch instructions rather than placeholders */
 
+	int br_block_idx = 0;
+
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
 		printf("Scheduled? %d\n", block->is_scheduled);
 		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
@@ -2394,13 +2397,10 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 				/* Determine the block we're jumping to */
 				int target_number = ins->branch.target_start;
-				printf("Target number %d\n", target_number);
+				printf("Jumping from %d to %d\n", br_block_idx, target_number);
 				midgard_block *target = util_dynarray_element(&ctx->blocks, midgard_block, target_number);
 
 				assert(target);
-				printf("Target %p\n", target);
-				printf("Scheduled %d\n", target->is_scheduled);
-				printf("Bundles %p\n", &target->bundles);
 
 				/* Determine the destination tag */
 				midgard_bundle *first = util_dynarray_element(&target->bundles, midgard_bundle, 0);
@@ -2434,6 +2434,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				ins->br_compact = compact;
 			}
 		}
+
+		++br_block_idx;
 	}
 
 	/* Emit flat binary from the instruction arrays. Iterate each block in
