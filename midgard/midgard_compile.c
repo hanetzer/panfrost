@@ -1459,6 +1459,7 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 						emit_binary_vector_instruction(&ins, bundle.register_words,
 								&bundle.register_words_count, bundle.body_words,
 								bundle.body_size, &bundle.body_words_count, &bytes_emitted);
+						printf("index zero\n");
 					} else {
 						/* Analyse the group to see if r0 is written in full */
 						bool components[4] = { 0 };
@@ -1486,16 +1487,24 @@ schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 						if (breakup)
 							break;
 
+						printf("index full\n");
+
 						/* Otherwise, we're free to proceed */
 					}
 
 					bundle.body_size[bundle.body_words_count] = sizeof(ains->br_compact);
+					memcpy(&bundle.body_words[bundle.body_words_count++], &ains->br_compact, sizeof(ains->br_compact));
 					bytes_emitted += sizeof(ains->br_compact);
 				} else {
 					/* TODO: Vector/scalar stuff operates in parallel. This is probably faulty logic */
 
+ 					midgard_scalar_alu scalarised = vector_to_scalar_alu(ains->alu);
+
+					memcpy(&bundle.register_words[bundle.register_words_count++], &ains->registers, sizeof(ains->registers));
 					bytes_emitted += sizeof(midgard_reg_info);
+
 					bundle.body_size[bundle.body_words_count] = sizeof(midgard_scalar_alu);
+                                        memcpy(&bundle.body_words[bundle.body_words_count++], &scalarised, sizeof(midgard_scalar_alu));
 					bytes_emitted += sizeof(midgard_scalar_alu);
 				}
 
