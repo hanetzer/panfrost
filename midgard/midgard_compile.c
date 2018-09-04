@@ -299,9 +299,21 @@ attach_constants(midgard_instruction *ins, void *constants)
 	memcpy(&ins->constants, constants, 16); /* TODO: How big? */
 }
 
+typedef struct midgard_bundle {
+	/* Tag for the overall bundle */
+	int tag;
+
+	/* Instructions contained by the bundle */
+	int instruction_count;
+	midgard_instruction instructions[5];
+} midgard_bundle;
+
 typedef struct midgard_block {
 	/* List of midgard_instructions emitted for the current block */
 	struct util_dynarray instructions;
+
+	/* List of midgard_bundles emitted (after the scheduler has run) */
+	struct util_dynarray bundles;
 
 	struct midgard_block *next_fallthrough;
 } midgard_block;
@@ -1279,17 +1291,23 @@ can_alu_run_concurrent(midgard_instruction *first, midgard_instruction *second)
 	return true;
 }
 
-/* Returns the number of instructions emitted (minus one). In trivial cases,
- * this equals one (zero returned), but when instructions are paired (the
- * optimal case) this can be two, or in the best case for ALUs, up to five. */
+/* Schedules, but does not emit, a single basic block. After scheduling, the
+ * final tag and size of the block are known, which are necessary for branching
+ * */
 
-static int
-emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct util_dynarray *emission)
+static midgard_bundle
+schedule_bundle(compiler_context *ctx, midgard_instruction *ins)
 {
 	int instructions_emitted = 0;
+	midgard_bundle bundle;
 
 	uint8_t tag = ins->type;
 
+	/* Default to the instruction's tag */
+	bundle.tag = tag;
+
+	/* Disable proper scheduling for now */
+#if 0
 	switch(ins->type) {
 		case TAG_ALU_4:
 		case TAG_ALU_8:
@@ -1398,10 +1416,6 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 
 				segment[segment_size++] = ains;
 
-				/* ^^ In case that's unsafe, keeping this handy */
-				//if (last_unit >= UNIT_VADD && ains->unit >= UNIT_VADD) break;
-				//if (last_unit >= UNIT_VMUL && last_unit < UNIT_VADD && ains->unit <= UNIT_VADD) break;
-
 				/* Only one set of embedded constants per
 				 * bundle possible; if we have more, we must
 				 * break the chain early, unfortunately */
@@ -1475,18 +1489,12 @@ emit_binary_instruction(compiler_context *ctx, midgard_instruction *ins, struct 
 					}
 
 					body_size[body_words_count] = sizeof(ains->br_compact);
-					memcpy(&body_words[body_words_count++], &ains->br_compact, sizeof(ains->br_compact));
 					bytes_emitted += sizeof(ains->br_compact);
 				} else {
 					/* TODO: Vector/scalar stuff operates in parallel. This is probably faulty logic */
 
-					memcpy(&register_words[register_words_count++], &ains->registers, sizeof(ains->registers));
 					bytes_emitted += sizeof(midgard_reg_info);
-
-					midgard_scalar_alu scalarised = vector_to_scalar_alu(ains->alu);
-
 					body_size[body_words_count] = sizeof(midgard_scalar_alu);
-					memcpy(&body_words[body_words_count++], &scalarised, sizeof(midgard_scalar_alu));
 					bytes_emitted += sizeof(midgard_scalar_alu);
 				}
 
@@ -1511,33 +1519,11 @@ skip_instruction:
 			}
 
 			/* Constants must always be quadwords */
-			if (has_embedded_constants) {
+			if (has_embedded_constants)
 				bytes_emitted += 16;
-			}
 
 			/* Size ALU instruction for tag */
-			control |= (TAG_ALU_4) + (bytes_emitted / 16) - 1;
-			
-			/* Actually emit each component */
-			EMIT_AND_COUNT(uint32_t, control);
-
-			for (int i = 0; i < register_words_count; ++i)
-				util_dynarray_append(emission, uint16_t, register_words[i]);
-
-			for (int i = 0; i < body_words_count; ++i)
-				memcpy(util_dynarray_grow(emission, body_size[i]), &body_words[i], body_size[i]);
-
-			/* Emit padding */
-			util_dynarray_grow(emission, padding);
-
-			/* Tack on constants */
-
-			if (has_embedded_constants) {
-				EMIT_AND_COUNT(float, constants[0]);
-				EMIT_AND_COUNT(float, constants[1]);
-				EMIT_AND_COUNT(float, constants[2]);
-				EMIT_AND_COUNT(float, constants[3]);
-			}
+			bundle.tag = (TAG_ALU_4) + (bytes_emitted / 16) - 1;
 
 			break;
 		 }
@@ -1552,12 +1538,7 @@ skip_instruction:
 			 * nonexistent) instruction scheduler.
 			 */
 
-			uint64_t current64, next64;
-			
 			midgard_load_store_word current = ins->load_store;
-			memcpy(&current64, &current, sizeof(current));
-
-			bool filled_next = false;
 
 			if (IN_ARRAY(ins + 1, ctx->current_block) && ((ins + 1)->type == TAG_LOAD_STORE_4)) {
 				midgard_load_store_word next = (ins + 1)->load_store;
@@ -1566,20 +1547,87 @@ skip_instruction:
 				 * they are not dependent */
 
 				if (can_ld_st_run_concurrent(&current, &next)) {
-					memcpy(&next64, &next, sizeof(next));
-
 					/* Skip ahead one, since it's redundant with the pair */
 					instructions_emitted++;
-
-					filled_next = true;
 				}
 			}
 
-			if (!filled_next)
+			break;
+		}
+
+		case TAG_TEXTURE_4:
+			/* TODO: Schedule texture ops */
+			break;
+
+		default:
+			printf("Unknown midgard instruction type\n");
+			break;
+	}
+#endif
+
+	/* Copy the instructions into the bundle */
+	bundle.instruction_count = instructions_emitted + 1;
+	
+	for (int i = 0; i < bundle.instruction_count; ++i)
+		bundle.instructions[i] = *(ins + i);
+
+	return bundle;
+}
+
+static void
+schedule_block(compiler_context *ctx, midgard_block *block)
+{
+	util_dynarray_init(&block->bundles, NULL);
+
+	util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
+		if (!ins->unused) {
+			midgard_bundle bundle = schedule_bundle(ctx, ins);
+			util_dynarray_append(&block->bundles, midgard_bundle, bundle);
+			
+			ins += bundle.instruction_count - 1;
+		}
+	}
+}
+
+static void
+schedule_program(compiler_context *ctx)
+{
+	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
+		schedule_block(ctx, block);
+	}
+}
+
+/* After everything is scheduled, emit whole bundles at a time */
+
+static void
+emit_binary_bundle(compiler_context *ctx, midgard_bundle *bundle, struct util_dynarray *emission)
+{
+	printf("Bundle\n");
+	switch(bundle->tag) {
+		case TAG_ALU_4:
+		case TAG_ALU_8:
+		case TAG_ALU_12:
+		case TAG_ALU_16: {
+			printf("Skip ALU\n");
+			break;
+		 }
+
+		case TAG_LOAD_STORE_4: {
+					       printf("LD\n");
+			/* One or two composing instructions */
+
+			uint64_t current64, next64;
+
+			memcpy(&current64, &bundle->instructions[0].load_store, sizeof(current64));
+			
+			if (bundle->instruction_count == 2) {
+				memcpy(&next64, &bundle->instructions[1].load_store, sizeof(next64));
+			} else {
 				next64 = LDST_NOP;
+			}
 
 			midgard_load_store instruction = {
-				.type = tag,
+				.type = bundle->tag,
 				.word1 = current64,
 				.word2 = next64
 			};
@@ -1592,7 +1640,10 @@ skip_instruction:
 		case TAG_TEXTURE_4: {
 			/* Texture instructions are easy, since there is no
 			 * pipelining nor VLIW to worry about. We may need to set the .last flag */
+			printf("Tex\n");
 			
+			midgard_instruction *ins = &bundle->instructions[0];
+
 			ins->texture.type = TAG_TEXTURE_4;
 
 			ctx->texture_op_count--;
@@ -1610,8 +1661,6 @@ skip_instruction:
 			printf("Unknown midgard instruction type\n");
 			break;
 	}
-
-	return instructions_emitted;
 }
 
 
@@ -2257,7 +2306,10 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 		util_dynarray_append(compiled, midgard_load_store, instruction);
 	}
 
-	/* Now that all the blocks are emitted and we can calculate their
+	/* Schedule! */
+	schedule_program(ctx);
+
+	/* Now that all the bundles are schedule and we can calculate block
 	 * sizes, emit actual branch instructions rather than placeholders */
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
@@ -2313,13 +2365,11 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	 * be assigned easily */
 
 	util_dynarray_foreach(&ctx->blocks, midgard_block, block) {
-		util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
-			if (!ins->unused) {
-				util_dynarray_append(&tags, int, compiled->size);
-				ins += emit_binary_instruction(ctx, ins, compiled);
-			}
+		util_dynarray_foreach(&block->bundles, midgard_bundle, bundle) {
+			emit_binary_bundle(ctx, bundle, compiled);
 		}
 
+		/* TODO: Free deeper */
 		util_dynarray_fini(block);
 	}
 
