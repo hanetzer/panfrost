@@ -337,6 +337,9 @@ typedef struct midgard_block {
 	/* List of midgard_bundles emitted (after the scheduler has run) */
 	struct util_dynarray bundles;
 
+	/* Number of quadwords _actually_ emitted, as determined after scheduling */
+	unsigned quadword_count;
+
 	struct midgard_block *next_fallthrough;
 } midgard_block;
 
@@ -2398,8 +2401,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				/* Determine the block we're jumping to */
 				int target_number = ins->branch.target_start;
 				printf("Jumping from %d to %d\n", br_block_idx, target_number);
-				midgard_block *target = util_dynarray_element(&ctx->blocks, midgard_block, target_number);
 
+				midgard_block *target = util_dynarray_element(&ctx->blocks, midgard_block, target_number);
 				assert(target);
 
 				/* Determine the destination tag */
@@ -2408,6 +2411,14 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 
 				int dest_tag = first->tag;
 				printf("Dest tag: %X\n", dest_tag);
+
+				/* Count up the number of quadwords we're jumping over. That is, the number of quadwords in each of the blocks between (br_block_idx, target_number) */
+				for (int idx = br_block_idx + 1; idx < target_number; ++idx) {
+					midgard_block *blk = util_dynarray_element(&ctx->blocks, midgard_block, idx);
+					assert(blk);
+
+					printf("Jumping over %d (%d)\n", idx, blk->quadword_count);
+				}
 
 				if (ins->branch.conditional) {
 					midgard_branch_cond branch = {
