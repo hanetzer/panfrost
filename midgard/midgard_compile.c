@@ -914,7 +914,7 @@ emit_tex(compiler_context *ctx, nir_tex_instr *instr)
 	assert (!instr->texture_array_size);
 	assert (instr->op == nir_texop_tex);
 
-	int texture_index = instr->texture ? instr->texture->var->data.location : instr->texture_index;
+	int texture_index = instr->texture_index;
 
 	/* TODO: Vulkan, where texture =/= sampler */
 	int sampler_index = texture_index;
@@ -2102,9 +2102,6 @@ transform_position_writes(nir_shader *shader)
 				nir_variable *out = NULL;
 
 				switch (intr->intrinsic) {
-					case nir_intrinsic_store_var:
-						out = intr->variables[0]->var;
-						break;
 					case nir_intrinsic_store_output:
 						/* already had i/o lowered.. lookup the matching output var: */
 						printf("SO\n");
