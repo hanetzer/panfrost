@@ -386,6 +386,9 @@ typedef struct compiler_context {
 	/* Used for cont/last hinting. Increase when a tex op is added.
 	 * Decrease when a tex op is removed. */
 	int texture_op_count;
+
+	/* Count of special uniforms (viewport, etc) in vec4 units */
+	int special_uniforms;
 } compiler_context;
 
 static int
@@ -791,6 +794,16 @@ emit_intrinsic(compiler_context *ctx, nir_intrinsic_instr *instr)
 			if (instr->intrinsic == nir_intrinsic_load_uniform) {
 				/* TODO: half-floats */
 				/* TODO: Spill to ld_uniform */
+
+				if (offset >= SPECIAL_UNIFORM_BASE) {
+					/* XXX: Resolve which uniform */
+					offset = 0;
+				} else {
+					/* Offset away from the special
+					 * uniform block */
+
+					offset += ctx->special_uniforms;
+				}
 
 				int reg_slot = 23 - offset;
 				
@@ -2064,15 +2077,15 @@ write_transformed_position(nir_builder *b, nir_src input_point_src, int uniform_
 	
 	/* Formatted as <width, height, centerx, centery> */
 	nir_ssa_def *viewport_vec4 = &load->dest.ssa;
-#if 0
 	nir_ssa_def *viewport_width = nir_channel(b, viewport_vec4, 0);
 	nir_ssa_def *viewport_height = nir_channel(b, viewport_vec4, 1);
 	nir_ssa_def *viewport_offset = nir_channels(b, viewport_vec4, 0x8 | 0x4);
-#endif
+#if 0
 
 	nir_ssa_def *viewport_width = nir_imm_float(b, 2048);
 	nir_ssa_def *viewport_height = nir_imm_float(b, 1280);
 	nir_ssa_def *viewport_offset = nir_vec2(b, nir_imm_float(b, 1024), nir_imm_float(b, 640));
+#endif
 
 	/* XXX: From uniforms? */
 	nir_ssa_def *depth_near = nir_imm_float(b, 0.0);
@@ -2157,7 +2170,7 @@ transform_position_writes(nir_shader *shader)
 				nir_builder_init(&b, func->impl);
 				b.cursor = nir_before_instr(instr);
 
-				write_transformed_position(&b, intr->src[0], shader->num_uniforms - 1);
+				write_transformed_position(&b, intr->src[0], UNIFORM_VIEWPORT);
 				nir_instr_remove(instr);
 			}
 		}
@@ -2315,6 +2328,15 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 	};
 
 	compiler_context *ctx = &ictx;
+
+	switch (ctx->stage) {
+		case MESA_SHADER_VERTEX:
+			ctx->special_uniforms = 1;
+			break;
+		default:
+			ctx->special_uniforms = 0;
+			break;
+	}
 
 	/* Append epilogue uniforms if necessary. The cmdstream depends on
 	 * these being at the -end-; see assign_var_locations. */
