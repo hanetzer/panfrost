@@ -2430,18 +2430,22 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				printf("Dest tag: %X\n", dest_tag);
 
 				/* Count up the number of quadwords we're jumping over. That is, the number of quadwords in each of the blocks between (br_block_idx, target_number) */
+				assert(target_number > br_block_idx); /* TODO: Jumps backwards */
+
+				int quadword_offset = 0;
+
 				for (int idx = br_block_idx + 1; idx < target_number; ++idx) {
 					midgard_block *blk = util_dynarray_element(&ctx->blocks, midgard_block, idx);
 					assert(blk);
-
-					printf("Jumping over %d (%d)\n", idx, blk->quadword_count);
+					
+					quadword_offset += blk->quadword_count;
 				}
 
 				if (ins->branch.conditional) {
 					midgard_branch_cond branch = {
 						.op = midgard_jmp_writeout_op_branch_cond,
-						.dest_tag = dest_tag, /* TODO */
-						.offset = 0, /* TODO */
+						.dest_tag = dest_tag,
+						.offset = quadword_offset,
 						.cond = ins->branch.invert_conditional ? 1 : 2
 					};
 
@@ -2449,8 +2453,8 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				} else {
 					midgard_branch_uncond branch = {
 						.op = midgard_jmp_writeout_op_branch_uncond,
-						.dest_tag = dest_tag, /* TODO */
-						.offset = 0, /* TODO */
+						.dest_tag = dest_tag, 
+						.offset = quadword_offset, 
 						.unknown = 1
 					};
 
