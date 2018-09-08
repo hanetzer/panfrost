@@ -1031,10 +1031,10 @@ emit_instr(compiler_context *ctx, struct nir_instr *instr)
 #define IN_ARRAY(n, arr) (n < (((char *) ((arr)->data)) + ((arr)->size)))
 
 static bool
-is_ssa_used_later(compiler_context *ctx, midgard_instruction *ins, int ssa)
+is_ssa_used_later(midgard_block *block, midgard_instruction *ins, int ssa)
 {
 	for (midgard_instruction *candidate = ins + 1;
-	     IN_ARRAY(candidate, ctx->current_block);
+	     IN_ARRAY(candidate, &block->instructions);
 	     candidate += 1) {
 		if (!candidate->uses_ssa) continue;
 
@@ -1063,7 +1063,7 @@ allocate_first_free_register(compiler_context *ctx)
 }
 
 static int
-normal_ssa_to_register(compiler_context *ctx, midgard_instruction *ins, int ssa)
+normal_ssa_to_register(compiler_context *ctx, midgard_block *block, midgard_instruction *ins, int ssa)
 {
 	int reg = (int) _mesa_hash_table_u64_search(ctx->ssa_to_register, ssa + 1);
 
@@ -1077,7 +1077,7 @@ normal_ssa_to_register(compiler_context *ctx, midgard_instruction *ins, int ssa)
 
 	/* Free the register if possible */
 
-	if (!is_ssa_used_later(ctx, ins, ssa))
+	if (!is_ssa_used_later(block, ins, ssa))
 		ctx->used_registers &= ~(1 << reg);
 
 	return reg;
@@ -1086,13 +1086,13 @@ normal_ssa_to_register(compiler_context *ctx, midgard_instruction *ins, int ssa)
 /* Transform to account for SSA register aliases */
 
 static int
-dealias_register(compiler_context *ctx, midgard_instruction *ins, int reg, bool is_ssa)
+dealias_register(compiler_context *ctx, midgard_block *block, midgard_instruction *ins, int reg, bool is_ssa)
 {
 	if (reg >= SSA_FIXED_MINIMUM)
 		return SSA_REG_FROM_FIXED(reg);
 
 	if (reg >= 0)
-		return is_ssa ? normal_ssa_to_register(ctx, ins, reg) : reg;
+		return is_ssa ? normal_ssa_to_register(ctx, block, ins, reg) : reg;
 
 	switch(reg) {
 		/* fmov style unused */
@@ -1108,16 +1108,16 @@ dealias_register(compiler_context *ctx, midgard_instruction *ins, int reg, bool 
 }
 
 static void
-allocate_registers(compiler_context *ctx)
+allocate_registers(compiler_context *ctx, midgard_block *block)
 {
-	util_dynarray_foreach(ctx->current_block, midgard_instruction, ins) {
+	util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
 		if (ins->unused) continue;
 
 		ssa_args args = ins->ssa_args;
 
 		switch (ins->type) {
 			case TAG_ALU_4:
-				ins->registers.src1_reg = dealias_register(ctx, ins, args.src0, ins->uses_ssa);
+				ins->registers.src1_reg = dealias_register(ctx, block, ins, args.src0, ins->uses_ssa);
 
 				ins->registers.src2_imm = args.inline_constant;
 
@@ -1143,11 +1143,11 @@ allocate_registers(compiler_context *ctx)
 #endif
 					//assert(0); /* XXX: Reenable inline constant */
 				} else {
-					ins->registers.src2_reg = dealias_register(ctx, ins, args.src1, ins->uses_ssa);
+					ins->registers.src2_reg = dealias_register(ctx, block, ins, args.src1, ins->uses_ssa);
 				}
 
 				/* Output register at the end due to the natural flow of registers, allowing for in place operations */
-				ins->registers.out_reg = dealias_register(ctx, ins, args.dest, ins->uses_ssa && !args.literal_out);
+				ins->registers.out_reg = dealias_register(ctx, block, ins, args.dest, ins->uses_ssa && !args.literal_out);
 
 				break;
 			
@@ -1156,7 +1156,7 @@ allocate_registers(compiler_context *ctx)
 				int ssa_arg = has_dest ? args.dest : args.src0;
 				bool not_literal_out = has_dest ? !args.literal_out : true;
 
-				ins->load_store.reg = dealias_register(ctx, ins, ssa_arg, ins->uses_ssa && not_literal_out);
+				ins->load_store.reg = dealias_register(ctx, block, ins, ssa_arg, ins->uses_ssa && not_literal_out);
 
 				break;
 		        }
@@ -1619,6 +1619,10 @@ static void
 schedule_block(compiler_context *ctx, midgard_block *block)
 {
 	printf("Scheduling block %p\n", block);
+
+	/* Do RA right now since some of the registers are de facto needed by schediling XXX */
+	allocate_registers(ctx, block);
+
 	util_dynarray_init(&block->bundles, NULL);
 
 	block->quadword_count = 0;
@@ -2226,9 +2230,6 @@ emit_block(compiler_context *ctx, nir_block *block)
 	/* Document the fallthrough chain */
 	ctx->previous_source_block = block_ptr;
 
-	/* Finally, register allocation! Must be done after everything else */
-	allocate_registers(ctx);
-
 	return block_ptr;
 }
 
@@ -2465,6 +2466,7 @@ midgard_compile_shader_nir(nir_shader *nir, struct util_dynarray *compiled)
 				ins->unit = ALU_ENAB_BR_COMPACT;
 				ins->br_compact = compact;
 			}
+
 		}
 
 		++br_block_idx;
