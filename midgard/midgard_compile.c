@@ -1598,11 +1598,30 @@ skip_instruction:
 	return bundle;
 }
 
+static int
+quadword_size(int tag)
+{
+	switch (tag) {
+		case TAG_ALU_4: 	return 1;
+		case TAG_ALU_8: 	return 2;
+		case TAG_ALU_12: 	return 3;
+		case TAG_ALU_16: 	return 4;
+		case TAG_LOAD_STORE_4: 	return 1;
+		case TAG_TEXTURE_4: 	return 1;
+		default: 		assert(0);
+	}
+}
+
+/* Schedule a single block by iterating its instruction to create bundles.
+ * While we go, tally about the bundle sizes to compute the block size. */
+
 static void
 schedule_block(compiler_context *ctx, midgard_block *block)
 {
 	printf("Scheduling block %p\n", block);
 	util_dynarray_init(&block->bundles, NULL);
+
+	block->quadword_count = 0;
 
 	util_dynarray_foreach(&block->instructions, midgard_instruction, ins) {
 		if (!ins->unused) {
@@ -1610,6 +1629,7 @@ schedule_block(compiler_context *ctx, midgard_block *block)
 			util_dynarray_append(&block->bundles, midgard_bundle, bundle);
 			
 			ins += bundle.instruction_count - 1;
+			block->quadword_count += quadword_size(bundle.tag);
 		}
 	}
 
