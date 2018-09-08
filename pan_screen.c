@@ -340,7 +340,7 @@ panfrost_get_shader_param(struct pipe_screen *screen,
                 return 16384;
 
         case PIPE_SHADER_CAP_MAX_CONTROL_FLOW_DEPTH:
-                return 0; /* XXX */
+                return 1024; 
 
         case PIPE_SHADER_CAP_MAX_INPUTS:
                 return 16;
