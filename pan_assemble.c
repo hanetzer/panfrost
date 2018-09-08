@@ -138,8 +138,8 @@ panfrost_shader_compile(struct panfrost_context *ctx, struct mali_shader_meta *m
     } else {
 	    meta->attribute_count = 0;
 	    meta->varying_count = varying_count;
-	    meta->texture_count = 1;
-	    meta->sampler_count = 1;
+	    meta->texture_count = 3;
+	    meta->sampler_count = 3;
 	    meta->midgard1.uniform_count = 12;
 	    meta->midgard1.unknown1 = MALI_NO_ALPHA_TO_COVERAGE | 0x200; /* XXX: WTF is this?! */
     }
