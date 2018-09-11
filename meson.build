@@ -43,7 +43,7 @@ midgard_nir_algebraic_c = custom_target(
   input : 'midgard/midgard_nir_algebraic.py',
   output : 'midgard_nir_algebraic.c',
   command : [
-    prog_python2, '@INPUT@',
+    prog_python, '@INPUT@',
     '-p', join_paths(meson.source_root(), 'src/compiler/nir/'),
   ],
   capture : true,

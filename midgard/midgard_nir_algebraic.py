@@ -59,12 +59,12 @@ def main():
 def run():
     import nir_algebraic  # pylint: disable=import-error
 
-    print '#include "midgard_nir.h"'
-    print nir_algebraic.AlgebraicPass("midgard_nir_lower_algebraic",
-                                      algebraic).render()
+    print('#include "midgard_nir.h"')
+    print(nir_algebraic.AlgebraicPass("midgard_nir_lower_algebraic",
+                                      algebraic).render())
 
-    print nir_algebraic.AlgebraicPass("midgard_nir_scale_trig",
-                                      scale_trig).render()
+    print(nir_algebraic.AlgebraicPass("midgard_nir_scale_trig",
+                                      scale_trig).render())
 
 
 if __name__ == '__main__':
