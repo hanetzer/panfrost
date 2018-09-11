@@ -89,15 +89,15 @@ panfrost_resource_get_handle(struct pipe_screen *screen,
 
 	handle->stride = rsrc->stride;
 
-	if (handle->type == DRM_API_HANDLE_TYPE_SHARED) {
+	if (handle->type == WINSYS_HANDLE_TYPE_SHARED) {
 		printf("Missed shared handle\n");
 		return FALSE;
 		//return etna_bo_get_name(rsc->bo, &handle->handle) == 0;
-	} else if (handle->type == DRM_API_HANDLE_TYPE_KMS) {
+	} else if (handle->type == WINSYS_HANDLE_TYPE_KMS) {
 		printf("Missed nonrenderonly KMS\n");
 		return FALSE;
 		//handle->handle = etna_bo_handle(rsc->bo);
-	} else if (handle->type == DRM_API_HANDLE_TYPE_FD) {
+	} else if (handle->type == WINSYS_HANDLE_TYPE_FD) {
 		printf("Missed dmabuf\n");
 		return FALSE;
 		//handle->handle = etna_bo_dmabuf(rsc->bo);
